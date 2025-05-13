@@ -1,7 +1,7 @@
 library(tidyverse)
 source("code/config.R")
 
-load_scores <- function(diseases = c("sari", "are"), by_horizon = FALSE) {
+load_scores <- function(diseases = c("sari", "are"), by_age = FALSE, by_horizon = FALSE) {
   df <- read_csv("data/scores.csv", show_col_types = FALSE) %>%
     mutate(
       level = factor(level, levels = c("national", "age", "states"), ordered = TRUE)
@@ -16,6 +16,9 @@ load_scores <- function(diseases = c("sari", "are"), by_horizon = FALSE) {
     filter(disease %in% diseases)
   
   group_cols <- c("disease", "level", "model")
+  if (by_age) {
+    group_cols <- c(group_cols, "age_group")
+  }
   if (by_horizon) {
     group_cols <- c(group_cols, "horizon")
   }
@@ -190,7 +193,7 @@ plot_coverage(df_sari)
 ggsave("figures/coverage.pdf", width = 190.5, height = 110, unit = "mm", device = "pdf")
 
 
-
+### WIS by horizon
 
 df_sari <- load_scores(diseases = "sari", by_horizon = TRUE)
 
@@ -261,3 +264,76 @@ p <- ggplot() +
 p
 
 ggsave("figures/wis_by_horizon.pdf", width = 190.5, height = 110, unit = "mm", device = "pdf")
+
+
+### By age group
+
+df_sari <- load_scores(diseases = "sari", by_age = TRUE) %>% 
+  filter(age_group != '00+')
+
+scores <- df_sari %>%
+  pivot_longer(
+    cols = c(wis, underprediction, spread, overprediction),
+    names_to = "metric",
+    values_to = "value"
+  )
+
+plot_wis_by_age <- function(scores){
+  model_order <- MODEL_ORDER[MODEL_ORDER %in% unique(scores$model)]
+  scores <- scores %>%
+    mutate(model = factor(model, levels = model_order, ordered = TRUE))
+  
+  # Separate data for WIS and components
+  scores_wis <- scores %>% filter(metric == "wis")
+  scores_components <- scores %>% filter(metric != "wis")
+  
+  
+  p <- ggplot() +
+    geom_bar(
+      data = scores_wis,
+      aes(x = model, y = value, color = model),
+      fill = "white",
+      stat = "identity",
+      width = 0.7,
+      show.legend = FALSE
+    ) +
+    geom_bar(
+      data = scores_components,
+      aes(x = model, y = value, fill = model, alpha = metric),
+      stat = "identity",
+      width = 0.7,
+      size = 0.1,
+      show.legend = TRUE
+    ) +
+    scale_color_manual(values = MODEL_COLORS, guide = "none") +
+    scale_fill_manual(values = MODEL_COLORS, guide = "none") +
+    scale_alpha_discrete(
+      labels = c("overprediction" = "Overprediction",
+                 "spread" = "Spread",
+                 "underprediction" = "Underprediction"),
+      guide = guide_legend(reverse = FALSE)
+    ) +
+    labs(
+      x = NULL,
+      y = "WIS",
+      color = "Model",
+      alpha = "Decomposition of WIS:",
+      title = NULL #toupper(first(scores_wis$disease)) 
+    ) +
+    facet_wrap("age_group", scales = "free_y") +
+    theme_bw() +
+    custom_theme +
+    theme(
+      legend.position = "bottom"
+      # axis.text.x = element_text(size = 7, angle = 90, hjust = 0.5, vjust = 0.5),
+      # axis.text.y = element_text(size = 7)
+    )  
+}
+
+
+
+p <- plot_wis_by_age(scores)
+p
+
+ggsave("figures/wis_by_age.pdf", width = 160, height = 120, unit = "mm", device = "pdf")
+
