@@ -1,51 +1,6 @@
-source("code/config.R")
 library(tidyverse)
-
-load_targets <- function() {
-  names(SOURCE_DICT) %>%
-    map_dfr(~{
-      disease <- .x
-      source <- SOURCE_DICT[[disease]]
-      url <- str_glue("https://raw.githubusercontent.com/KITmetricslab/RESPINOW-Hub/main/data/{source}/{disease}/target-{source}-{disease}.csv")
-      
-      read_csv(url, show_col_types = FALSE) %>%
-        rename(target = value) %>%
-        mutate(source = source, disease = disease)
-    })
-}
-
-add_target <- function(df) {
-  df_target <- load_targets()
-  
-  df_combined <- df %>%
-    left_join(df_target, by = c("source", "disease", "location", "age_group", "target_end_date" = "date"))
-  
-  return(df_combined)
-}
-
-add_median <- function(df) {
-  df_median <- df %>%
-    filter(quantile == 0.5) %>%
-    mutate(type = "median")
-  
-  bind_rows(df, df_median)
-}
-
-load_submissions <- function(include_target = TRUE, include_median = TRUE) {
-  df <- read_csv("data/submissions.csv", show_col_types = FALSE)
-  
-  if (include_target) {
-    df <- add_target(df)
-  }
-  
-  if (include_median) {
-    df <- add_median(df)
-  }
-  
-  return(df)
-}
-
-###
+source("code/config.R")
+source("code/data_utils.R")
 
 load_latest_series <- function(indicator = "sari", wide=TRUE) {
   source <- SOURCE_DICT[[indicator]]
@@ -94,6 +49,12 @@ load_latest_series <- function(indicator = "sari", wide=TRUE) {
   }
 }
 
+ts1 <- load_latest_series('sari', wide=FALSE)
+ts2 <- load_latest_series('are')
+ts3 <- load_latest_series('influenza')
+ts4 <- load_latest_series('rsv')
+
+
 load_rt <- function(indicator = "sari", preprocessed = FALSE) {
   source <- SOURCE_DICT[[indicator]]
   
@@ -108,6 +69,12 @@ load_rt <- function(indicator = "sari", preprocessed = FALSE) {
   
   return(rt)
 }
+
+r1 <- load_rt('sari')
+r2 <- load_rt('are')
+r3 <- load_rt('influenza')
+r4 <- load_rt('rsv')
+
 
 set_last_n_values_to_na <- function(group) {
   n <- nrow(group)
@@ -136,6 +103,9 @@ target_as_of <- function(rt, date) {
   
   return(rt_temp)
 }
+
+r11 <- target_as_of(r1, "2025-04-27")
+
 
 load_target_series <- function(indicator = "sari", as_of = NULL, age_group = NULL) {
   source <- SOURCE_DICT[[indicator]]
@@ -193,6 +163,12 @@ load_target_series <- function(indicator = "sari", as_of = NULL, age_group = NUL
   return(target_wide)
 }
 
+t1 <- load_target_series('sari')
+t2 <- load_target_series('are')
+t3 <- load_target_series('influenza')
+t4 <- load_target_series('rsv')
+
+
 load_combined_series <- function(indicator = "sari", as_of = NULL, drop_incomplete = TRUE) {
   source <- SOURCE_DICT[[indicator]]
   
@@ -217,3 +193,8 @@ load_combined_series <- function(indicator = "sari", as_of = NULL, drop_incomple
   
   return(ts_combined)
 }
+
+t1 <- load_combined_series('sari')
+t2 <- load_combined_series('are')
+t3 <- load_combined_series('influenza')
+t4 <- load_combined_series('rsv')
