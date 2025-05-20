@@ -44,7 +44,8 @@ custom_theme <- theme(
   axis.text.y = element_text(size = 8)
 )
 
-MODEL_ORDER <- c("KIT-simple_nowcast", "KIT-epinowcast", "RIVM-GAM", "KIT-MeanEnsemble", "KIT-LightGBM", "KIT-TSMixer", "KIT-hhh4", "MPIDS-PS_embedding")
+MODEL_ORDER <- c("KIT-simple_nowcast", "KIT-epinowcast", "RIVM-GAM", "KIT-MeanEnsemble", 
+                 "KIT-LightGBM", "KIT-TSMixer", "KIT-hhh4", "MPIDS-PS_embedding", "baseline")
 
 MODEL_COLORS <- c(
   "KIT-MeanEnsemble"    = "#009E73",
@@ -54,7 +55,7 @@ MODEL_COLORS <- c(
   "KIT-simple_nowcast"  = "#56B4E9",
   "RIVM-GAM"            = "#80471C",
   "MPIDS-PS_embedding"  = "#CC79A7",
-  "Historical"          = "#000000",
+  "baseline"          = "#000000",
   "Persistence"         = "#80471C"
 )
 
@@ -122,16 +123,17 @@ plot_total_scores <- function(df_long, models = NULL) {
   return(p)
 }
 
-df_sari <- load_scores(diseases = "sari", by_horizon = FALSE)
+df_scores <- load_scores(diseases = "are", by_horizon = FALSE)
 
-df_sari_long <- df_sari %>%
+df_scores_long <- df_scores %>%
   pivot_longer(
     cols = c(wis, underprediction, spread, overprediction),
     names_to = "metric",
     values_to = "value"
   )
 
-p <- plot_total_scores(df_sari_long)
+p <- plot_total_scores(df_scores_long)
+p
 
 ggsave("figures/wis.pdf", width = 190.5, height = 110, unit = "mm", device = "pdf")
 
@@ -188,16 +190,16 @@ plot_coverage <- function(df_wide, models = NULL) {
   return(p)
 }
 
-plot_coverage(df_sari)
+plot_coverage(df_scores)
 
 ggsave("figures/coverage.pdf", width = 190.5, height = 110, unit = "mm", device = "pdf")
 
 
 ### WIS by horizon
 
-df_sari <- load_scores(diseases = "sari", by_horizon = TRUE)
+df_scores <- load_scores(diseases = "are", by_horizon = TRUE)
 
-df_sari_long <- df_sari %>%
+df_scores_long <- df_scores %>%
   pivot_longer(
     cols = c(wis, underprediction, spread, overprediction),
     names_to = "metric",
@@ -206,9 +208,9 @@ df_sari_long <- df_sari %>%
 
 level <- "national"
 
-scores <- df_sari_long %>% filter(level == !!level)
+scores <- df_scores_long %>% filter(level == !!level)
 
-scores <- df_sari_long
+scores <- df_scores_long
 
 model_order <- MODEL_ORDER[MODEL_ORDER %in% unique(scores$model)]
 scores <- scores %>%
