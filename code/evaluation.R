@@ -44,7 +44,7 @@ custom_theme <- theme(
   axis.text.y = element_text(size = 8)
 )
 
-MODEL_ORDER <- c("KIT-simple_nowcast", "KIT-epinowcast", "RIVM-GAM", "KIT-MeanEnsemble", 
+MODEL_ORDER <- c("KIT-simple_nowcast", "KIT-epinowcast", "RIVM-GAM", "HZI-ODEmodel", "KIT-MeanEnsemble", 
                  "KIT-LightGBM", "KIT-TSMixer", "KIT-hhh4", "MPIDS-PS_embedding", "baseline")
 
 MODEL_COLORS <- c(
@@ -123,7 +123,7 @@ plot_total_scores <- function(df_long, models = NULL) {
   return(p)
 }
 
-df_scores <- load_scores(diseases = "are", by_horizon = FALSE)
+df_scores <- load_scores(diseases = "influenza", by_horizon = FALSE)
 
 df_scores_long <- df_scores %>%
   pivot_longer(
