@@ -28,6 +28,7 @@ list_submissions <- function() {
     filter(
       between(date, as.Date("2024-10-17"), as.Date("2025-03-27")),
       !date %in% c(as.Date("2024-12-26"), as.Date("2025-01-02")),
+      !str_detect(model, "_old"),
       !(model == "MPIDS-PS_embedding" & source == "survstat")
     )
 }

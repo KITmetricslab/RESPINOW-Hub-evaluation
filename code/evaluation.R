@@ -44,17 +44,21 @@ custom_theme <- theme(
   axis.text.y = element_text(size = 8)
 )
 
-MODEL_ORDER <- c("KIT-simple_nowcast", "KIT-epinowcast", "RIVM-GAM", "HZI-ODEmodel", "KIT-MeanEnsemble", 
-                 "KIT-LightGBM", "KIT-TSMixer", "KIT-hhh4", "MPIDS-PS_embedding", "baseline")
+MODEL_ORDER <- c("KIT-EnsembleNowcast", "KIT-simple_nowcast", "KIT-epinowcast", "RIVM-GAM", "HZI-ODEmodel", "KIT-MeanEnsemble", 
+                 "KIT-Ensemble", "KIT-LightGBM", "KIT-TSMixer", "KIT-hhh4", "MPIDS-PS_embedding", "baseline")
 
 MODEL_COLORS <- c(
   "KIT-MeanEnsemble"    = "#009E73",
+  "KIT-Ensemble"    = "#3dd193",
+  "KIT-EnsembleNowcast"    = "#004f9e",
+  "KIT-epinowcast" = "#8a8889",
   "KIT-LightGBM"        = "#B30000",
   "KIT-TSMixer"         = "#E69F00",
   "KIT-hhh4"            = "#3C4AAD",
   "KIT-simple_nowcast"  = "#56B4E9",
   "RIVM-GAM"            = "#80471C",
   "MPIDS-PS_embedding"  = "#CC79A7",
+  "HZI-ODEmodel" = "#99568e",
   "baseline"          = "#000000",
   "Persistence"         = "#80471C"
 )
@@ -123,7 +127,7 @@ plot_total_scores <- function(df_long, models = NULL) {
   return(p)
 }
 
-df_scores <- load_scores(diseases = "influenza", by_horizon = FALSE)
+df_scores <- load_scores(diseases = "sari", by_horizon = FALSE)
 
 df_scores_long <- df_scores %>%
   pivot_longer(
@@ -197,7 +201,7 @@ ggsave("figures/coverage.pdf", width = 190.5, height = 110, unit = "mm", device 
 
 ### WIS by horizon
 
-df_scores <- load_scores(diseases = "are", by_horizon = TRUE)
+df_scores <- load_scores(diseases = "sari", by_horizon = TRUE)
 
 df_scores_long <- df_scores %>%
   pivot_longer(
