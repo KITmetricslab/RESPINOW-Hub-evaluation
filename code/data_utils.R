@@ -137,7 +137,7 @@ target_as_of <- function(rt, date) {
   return(rt_temp)
 }
 
-load_target_series <- function(indicator = "sari", as_of = NULL, age_group = NULL) {
+load_target_series <- function(indicator = "sari", as_of = NULL, age_group = NULL, wide=TRUE) {
   source <- SOURCE_DICT[[indicator]]
   
   if (is.null(as_of)) {
@@ -175,29 +175,34 @@ load_target_series <- function(indicator = "sari", as_of = NULL, age_group = NUL
     mutate(date = as.Date(date)) %>%
     complete(age_group, date = seq(min(date), max(date), by = "7 days"), fill = list(value = 0))
   
-  # Pivot to wide format
-  target_wide <- target %>%
-    pivot_wider(
-      names_from = age_group,
-      values_from = value,
-      names_prefix = paste0(source, "-", indicator, "-")
-    ) %>%
-    select(!any_of(c("year", "week", "location")))
   
-  # Rename "00+" to "DE" if applicable
-  if (is.null(age_group) || age_group == "00+") {
-    target_wide <- target_wide %>%
-      rename_with(~ str_replace(., paste0(source, "-", indicator, "-00\\+"), paste0(source, "-", indicator, "-DE")))
+  if (wide){
+    target_wide <- target %>%
+      pivot_wider(
+        names_from = age_group,
+        values_from = value,
+        names_prefix = paste0(source, "-", indicator, "-")
+      ) %>%
+      select(!any_of(c("year", "week", "location")))
+    
+    return(target_wide)
+  } else {
+    return(target)
   }
   
-  return(target_wide)
+  # Rename "00+" to "DE" if applicable
+  # if (is.null(age_group) || age_group == "00+") {
+  #   target_wide <- target_wide %>%
+  #     rename_with(~ str_replace(., paste0(source, "-", indicator, "-00\\+"), paste0(source, "-", indicator, "-DE")))
+  # }
+  
 }
 
-load_combined_series <- function(indicator = "sari", as_of = NULL, drop_incomplete = TRUE) {
+load_combined_series <- function(indicator = "sari", as_of = NULL, drop_incomplete = TRUE, wide=FALSE) {
   source <- SOURCE_DICT[[indicator]]
   
-  ts_target <- load_target_series(indicator, as_of)       # wide format, one column per age_group
-  ts_latest <- load_latest_series(indicator, wide = TRUE) # same structure
+  ts_target <- load_target_series(indicator, as_of, wide = wide)       # wide format, one column per age_group
+  ts_latest <- load_latest_series(indicator, wide = wide) # same structure
   
   # Determine cutoff date from ts_target
   cutoff_date <- min(ts_target$date)
@@ -217,3 +222,28 @@ load_combined_series <- function(indicator = "sari", as_of = NULL, drop_incomple
   
   return(ts_combined)
 }
+
+load_submission_wide <- function(date,
+                               model = "KIT-MeanEnsemble", #"KIT-simple_nowcast"
+                               disease = "sari",
+                               location = "DE",
+                               age_group = "00+") {
+  source <- SOURCE_DICT[[disease]]
+  
+  file_path <- glue::glue("submissions/{source}/{disease}/{model}/{date}-{source}-{disease}-{model}.csv")
+  
+  readr::read_csv(file_path, show_col_types = FALSE) %>%
+    filter(
+      location == !!location,
+      age_group == !!age_group,
+      type == "quantile"
+    ) %>%
+    pivot_wider(
+      names_from = quantile,
+      values_from = value,
+      names_prefix = "quantile_"
+    ) %>%
+    relocate(location, age_group, target_end_date, forecast_date, horizon)
+}
+
+#m <- load_submission_wide("2024-10-24", "KIT-simple_nowcast", "are")

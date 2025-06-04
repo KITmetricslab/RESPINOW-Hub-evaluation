@@ -18,3 +18,31 @@ LEVEL_LABELS <- c(
   "states" = "State level",
   "age" = "Age groups"
 )
+
+MEMBERS_FORECAST <- list(
+  sari = c('KIT-hhh4', 'KIT-LightGBM', 'KIT-TSMixer', 'MPIDS-PS_embedding'),
+  are = c('KIT-hhh4', 'KIT-LightGBM', 'KIT-TSMixer', 'MPIDS-PS_embedding'),
+  influenza = c('HZI-ODEmodel'),
+  rsv = c('HZI-ODEmodel')
+)
+
+MEMBERS_NOWCAST <- list(
+  sari = c('KIT-simple_nowcast', 'KIT-epinowcast', 'RIVM-GAM'),
+  are = c('KIT-simple_nowcast'),
+  influenza = c('KIT-simple_nowcast', 'KIT-epinowcast', 'RIVM-GAM'),
+  rsv = c('KIT-simple_nowcast')
+)
+
+MODELS_FORECAST <- list(
+  sari = c('KIT-hhh4', 'KIT-LightGBM', 'KIT-TSMixer', 'MPIDS-PS_embedding', 'KIT-MeanEnsemble', 'KIT-Ensemble', 'baseline'),
+  are = c('KIT-hhh4', 'KIT-LightGBM', 'KIT-TSMixer', 'MPIDS-PS_embedding'),
+  influenza = c('HZI-ODEmodel'),
+  rsv = c('HZI-ODEmodel')
+)
+
+MODELS_NOWCAST <- list(
+  sari = c('KIT-simple_nowcast', 'KIT-epinowcast', 'RIVM-GAM'),
+  are = c('KIT-simple_nowcast'),
+  influenza = c('KIT-simple_nowcast', 'KIT-epinowcast', 'RIVM-GAM'),
+  rsv = c('KIT-simple_nowcast')
+)
