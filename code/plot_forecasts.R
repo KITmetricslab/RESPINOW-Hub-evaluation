@@ -37,31 +37,9 @@ df_all <- cross_df(list(indicator = indicators, date_version = dates)) %>%
   }) %>% 
   mutate(age_group = str_replace(age_group, "DE", "00\\+"))
 
-ggplot(df_all, aes(x = date, y = value, color = data_version)) +
-  geom_line(size = 1) +
-  facet_wrap(~ age_group, scales = "free_y", labeller = as_labeller(facet_labels)) +
-  labs(
-    x = NULL,
-    y = "Incidence",
-    color = "Data as of"
-  ) +
-  theme_bw() +
-  custom_theme
-
 truth_sari <- df_all %>% 
   filter(indicator == "sari",
          age_group %in% age_groups)
-
-ggplot(truth_sari, aes(x = date, y = value, color = data_version)) +
-  geom_line(size = 1) +
-  facet_wrap(~ age_group, scales = "free_y") +
-  labs(
-    x = NULL,
-    y = "Incidence",
-    color = "Data as of"
-  ) +
-  theme_bw() +
-  custom_theme
 
 ggplot(truth_sari, aes(x = date, y = value, color = data_version)) +
 
@@ -89,7 +67,6 @@ ggplot(truth_sari, aes(x = date, y = value, color = data_version)) +
     ),
     guide = guide_legend(order = 2, nrow = 2, direction = "vertical")
   ) +
-  
   theme_bw() +
   custom_theme
 
@@ -123,38 +100,8 @@ df_forecast <- df_sari %>%
   filter(model %in% MODELS_FORECAST[["sari"]])
 
 
-ggplot(truth_sari, aes(x = date, y = value, color = data_version)) +
-  
-  geom_line(aes(group = data_version, color = "as of forecast date"), size = 1) +
-  
-  # Add special line for final version (e.g., forecast_date == "2024-10-06")
-  geom_line(
-    data = truth_sari %>% filter(data_version == as.Date("2025-05-11")),
-    aes(x = date, y = value, color = "final"),
-    size = 1
-  ) +
-  
-  facet_wrap(~ age_group, scales = "free_y") +
-  labs(
-    x = NULL,
-    y = "Incidence",
-    color = "Data version"
-  ) +
-  
-  scale_color_manual(
-    name = "Data version",
-    values = c(
-      "as of forecast date" = "#D55E00",
-      "final" = "black"
-    ),
-    guide = guide_legend(order = 2, nrow = 2, direction = "vertical")
-  ) +
-  theme_bw() +
-  custom_theme
-
-
 # Vertical lines
-vline_data <- tibble(date = as.Date(dates))
+vline_data <- tibble(date = as.Date(dates[-length(dates)]))
 
 # Manual alpha values
 alphas <- c("50%" = 0.7, "95%" = 0.4)
@@ -204,15 +151,9 @@ ggplot(truth_sari) +
   ) +
   
   # Actual data lines
-  # geom_line(aes(x = date, y = value, group = data_version, color = "as of forecast date")) +
-  # geom_line(
-  #   data = df %>% filter(data_version == as.Date("2024-10-06")),
-  #   aes(x = date, y = value, color = "final")
-  # ) +
-
   geom_line(aes(x = date, y = value, group = data_version, color = "as of forecast date"), size = 1) +
   
-  # Add special line for final version (e.g., forecast_date == "2024-10-06")
+  # Add special line for final version 
   geom_line(
     data = truth_sari %>% filter(data_version == as.Date("2025-05-11")),
     aes(x = date, y = value, color = "final"),
