@@ -157,7 +157,7 @@ load_target_series <- function(indicator = "sari", as_of = NULL, age_group = NUL
   
   # Optional age group filtering
   if (!is.null(age_group)) {
-    target <- target %>% filter(age_group == age_group)
+    target <- target %>% filter(age_group == !!age_group)
   }
   
   
@@ -223,27 +223,27 @@ load_combined_series <- function(indicator = "sari", as_of = NULL, drop_incomple
   return(ts_combined)
 }
 
-load_submission_wide <- function(date,
-                               model = "KIT-MeanEnsemble", #"KIT-simple_nowcast"
-                               disease = "sari",
-                               location = "DE",
-                               age_group = "00+") {
-  source <- SOURCE_DICT[[disease]]
-  
-  file_path <- glue::glue("submissions/{source}/{disease}/{model}/{date}-{source}-{disease}-{model}.csv")
-  
-  readr::read_csv(file_path, show_col_types = FALSE) %>%
-    filter(
-      location == !!location,
-      age_group == !!age_group,
-      type == "quantile"
-    ) %>%
-    pivot_wider(
-      names_from = quantile,
-      values_from = value,
-      names_prefix = "quantile_"
-    ) %>%
-    relocate(location, age_group, target_end_date, forecast_date, horizon)
-}
+# load_submission_wide <- function(date,
+#                                model = "KIT-MeanEnsemble", #"KIT-simple_nowcast"
+#                                disease = "sari",
+#                                location = "DE",
+#                                age_group = "00+") {
+#   source <- SOURCE_DICT[[disease]]
+#   
+#   file_path <- glue::glue("submissions/{source}/{disease}/{model}/{date}-{source}-{disease}-{model}.csv")
+#   
+#   readr::read_csv(file_path, show_col_types = FALSE) %>%
+#     filter(
+#       location == !!location,
+#       age_group == !!age_group,
+#       type == "quantile"
+#     ) %>%
+#     pivot_wider(
+#       names_from = quantile,
+#       values_from = value,
+#       names_prefix = "quantile_"
+#     ) %>%
+#     relocate(location, age_group, target_end_date, forecast_date, horizon)
+# }
 
 #m <- load_submission_wide("2024-10-24", "KIT-simple_nowcast", "are")

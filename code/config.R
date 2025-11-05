@@ -7,11 +7,30 @@ SOURCE_DICT <- c(
 
 QUANTILES = c(0.025, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975)
 
-FORECAST_DATES = c("2024-10-17", "2024-10-24", "2024-10-31", "2024-11-07", "2024-11-14", 
-                   "2024-11-21", "2024-11-28", "2024-12-05", "2024-12-12", "2024-12-19", 
-                   "2025-01-09", "2025-01-16", "2025-01-23", "2025-01-30", "2025-02-06", 
-                   "2025-02-13", "2025-02-20", "2025-02-27", "2025-03-06", "2025-03-13", 
-                   "2025-03-20", "2025-03-27")
+FORECAST_DATES = c(
+  "2024-10-17",
+  "2024-10-24",
+  "2024-10-31",
+  "2024-11-07",
+  "2024-11-14",
+  "2024-11-21",
+  "2024-11-28",
+  "2024-12-05",
+  "2024-12-12",
+  "2024-12-19",
+  "2025-01-09",
+  "2025-01-16",
+  "2025-01-23",
+  "2025-01-30",
+  "2025-02-06",
+  "2025-02-13",
+  "2025-02-20",
+  "2025-02-27",
+  "2025-03-06",
+  "2025-03-13",
+  "2025-03-20",
+  "2025-03-27"
+)
 
 LEVEL_LABELS <- c(
   "national" = "National level",
@@ -27,21 +46,29 @@ MEMBERS_FORECAST <- list(
 )
 
 MEMBERS_NOWCAST <- list(
-  sari = c('KIT-simple_nowcast', 'KIT-epinowcast', 'RIVM-GAM'),
+  sari = c('KIT-simple_nowcast', 'KIT-epinowcast', 'RIVM-GAM', 'RKI-Pilot_01'),
   are = c('KIT-simple_nowcast'),
   influenza = c('KIT-simple_nowcast', 'KIT-epinowcast', 'RIVM-GAM'),
   rsv = c('KIT-simple_nowcast')
 )
 
 MODELS_FORECAST <- list(
-  sari = c('KIT-hhh4', 'KIT-LightGBM', 'KIT-TSMixer', 'MPIDS-PS_embedding', 'KIT-MeanEnsemble', 'KIT-Ensemble', 'baseline'),
+  sari = c(
+    'KIT-hhh4',
+    'KIT-LightGBM',
+    'KIT-TSMixer',
+    'MPIDS-PS_embedding',
+    'KIT-MeanEnsemble',
+    'KIT-Ensemble',
+    'baseline'
+  ),
   are = c('KIT-hhh4', 'KIT-LightGBM', 'KIT-TSMixer', 'MPIDS-PS_embedding'),
   influenza = c('HZI-ODEmodel'),
   rsv = c('HZI-ODEmodel')
 )
 
 MODELS_NOWCAST <- list(
-  sari = c('KIT-simple_nowcast', 'KIT-epinowcast', 'RIVM-GAM'),
+  sari = c('KIT-simple_nowcast', 'KIT-epinowcast', 'RIVM-GAM', 'RKI-Pilot_01'),
   are = c('KIT-simple_nowcast'),
   influenza = c('KIT-simple_nowcast', 'KIT-epinowcast', 'RIVM-GAM'),
   rsv = c('KIT-simple_nowcast')

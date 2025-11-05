@@ -27,7 +27,7 @@ df_all <- cross_df(list(indicator = indicators, date_version = dates)) %>%
     
     cat(indicator, date_version, "\n")
     
-    load_combined_series(indicator, as_of = date_version, drop_incomplete = FALSE) %>%
+    load_combined_series(indicator, as_of = date_version, drop_incomplete = FALSE, wide = FALSE) %>%
       #select(date, value = all_of(target)) %>%
       filter(date >= as.Date("2024-07-01")) %>%
       mutate(
