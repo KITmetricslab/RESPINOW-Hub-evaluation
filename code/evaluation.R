@@ -159,7 +159,7 @@ plot_total_scores <- function(df_long, models = NULL) {
   return(p)
 }
 
-df_scores <- load_scores(diseases = "are", by_horizon = FALSE)
+df_scores <- load_scores(diseases = "sari", by_horizon = FALSE)
 
 df_scores_long <- df_scores %>%
   pivot_longer(
@@ -258,7 +258,68 @@ ggsave(
 
 ### WIS by horizon
 
-df_scores <- load_scores(diseases = "are", by_horizon = TRUE)
+plot_wis_by_horizon <- function(df_scores_long){
+  
+  model_order <- MODEL_ORDER[MODEL_ORDER %in% unique(df_scores_long$model)]
+  df_scores_long <- df_scores_long %>%
+    mutate(model = factor(model, levels = model_order, ordered = TRUE))
+  
+  # Separate data for WIS and components
+  scores_wis <- df_scores_long %>% filter(metric == "wis")
+  scores_components <- df_scores_long %>% filter(metric != "wis")
+  
+  
+  p <- ggplot() +
+    geom_bar(
+      data = scores_wis,
+      aes(x = model, y = value, color = model),
+      fill = "white",
+      stat = "identity",
+      width = 0.7,
+      show.legend = FALSE
+    ) +
+    geom_bar(
+      data = scores_components,
+      aes(x = model, y = value, fill = model, alpha = metric),
+      stat = "identity",
+      width = 0.7,
+      show.legend = TRUE
+    ) +
+    scale_color_manual(values = MODEL_COLORS, guide = "none") +
+    scale_fill_manual(values = MODEL_COLORS, guide = "none") +
+    scale_alpha_discrete(
+      labels = c(
+        "overprediction" = "Overprediction",
+        "spread" = "Spread",
+        "underprediction" = "Underprediction"
+      ),
+      guide = guide_legend(reverse = FALSE)
+    ) +
+    labs(
+      x = NULL,
+      y = "WIS",
+      color = "Model",
+      alpha = "Decomposition of WIS:",
+      title = NULL #toupper(first(scores_wis$disease))
+    ) +
+    facet_grid(
+      level ~ horizon,
+      scales = "free",
+      labeller = labeller(level = LEVEL_LABELS)
+    ) +
+    theme_bw() +
+    custom_theme +
+    theme(
+      legend.position = "bottom"
+      # legend.title.position = "left",  # Not valid in ggplot2
+      # axis.text.x = element_text(size = 7, angle = 90, hjust = 0.5, vjust = 0.5),
+      # axis.text.y = element_text(size = 7)
+    )
+  
+  return(p)
+}
+
+df_scores <- load_scores(diseases = "sari", by_horizon = TRUE)
 
 df_scores_long <- df_scores %>%
   pivot_longer(
@@ -267,70 +328,7 @@ df_scores_long <- df_scores %>%
     values_to = "value"
   )
 
-level <- "national"
-
-scores <- df_scores_long %>% filter(level == !!level)
-
-scores <- df_scores_long
-
-model_order <- MODEL_ORDER[MODEL_ORDER %in% unique(scores$model)]
-scores <- scores %>%
-  mutate(model = factor(model, levels = model_order, ordered = TRUE))
-
-# Separate data for WIS and components
-scores_wis <- scores %>% filter(metric == "wis")
-scores_components <- scores %>% filter(metric != "wis")
-
-
-p <- ggplot() +
-  geom_bar(
-    data = scores_wis,
-    aes(x = model, y = value, color = model),
-    fill = "white",
-    stat = "identity",
-    width = 0.7,
-    show.legend = FALSE
-  ) +
-  geom_bar(
-    data = scores_components,
-    aes(x = model, y = value, fill = model, alpha = metric),
-    stat = "identity",
-    width = 0.7,
-    size = 0.1,
-    show.legend = TRUE
-  ) +
-  scale_color_manual(values = MODEL_COLORS, guide = "none") +
-  scale_fill_manual(values = MODEL_COLORS, guide = "none") +
-  scale_alpha_discrete(
-    labels = c(
-      "overprediction" = "Overprediction",
-      "spread" = "Spread",
-      "underprediction" = "Underprediction"
-    ),
-    guide = guide_legend(reverse = FALSE)
-  ) +
-  labs(
-    x = NULL,
-    y = "WIS",
-    color = "Model",
-    alpha = "Decomposition of WIS:",
-    title = NULL #toupper(first(scores_wis$disease))
-  ) +
-  facet_grid(
-    level ~ horizon,
-    scales = "free",
-    labeller = labeller(level = LEVEL_LABELS)
-  ) +
-  theme_bw() +
-  custom_theme +
-  theme(
-    legend.position = "bottom"
-    # legend.title.position = "left",  # Not valid in ggplot2
-    # axis.text.x = element_text(size = 7, angle = 90, hjust = 0.5, vjust = 0.5),
-    # axis.text.y = element_text(size = 7)
-  )
-
-p
+plot_wis_by_horizon(df_scores_long)
 
 ggsave(
   "figures/wis_by_horizon.pdf",
