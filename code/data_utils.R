@@ -247,3 +247,49 @@ load_combined_series <- function(indicator = "sari", as_of = NULL, drop_incomple
 # }
 
 #m <- load_submission_wide("2024-10-24", "KIT-simple_nowcast", "are")
+
+
+
+load_scores <- function(
+    diseases = c("sari", "are"),
+    by_age = FALSE,
+    by_horizon = FALSE
+) {
+  df <- read_csv("data/scores.csv", show_col_types = FALSE) %>%
+    mutate(
+      level = factor(
+        level,
+        levels = c("national", "age", "states"),
+        ordered = TRUE
+      )
+    )
+  
+  # Ensure diseases is a character vector
+  if (is.character(diseases) && length(diseases) == 1) {
+    diseases <- c(diseases)
+  }
+  
+  df <- df %>%
+    filter(disease %in% diseases)
+  
+  group_cols <- c("disease", "level", "model")
+  if (by_age) {
+    group_cols <- c(group_cols, "age_group")
+  }
+  if (by_horizon) {
+    group_cols <- c(group_cols, "horizon")
+  }
+  
+  df_summary <- df %>%
+    group_by(across(all_of(group_cols))) %>%
+    summarise(
+      across(
+        c(spread, overprediction, underprediction, wis, c50, c95),
+        mean,
+        na.rm = TRUE
+      ),
+      .groups = "drop"
+    )
+  
+  return(df_summary)
+}
