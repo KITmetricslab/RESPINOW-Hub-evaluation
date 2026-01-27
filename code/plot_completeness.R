@@ -9,12 +9,14 @@ df <- df %>%
     !forecast_date %in% c(as.Date("2024-12-26"), as.Date("2025-01-02"))
   ) %>%
   mutate(diff = parse_number(diff),
-         retrospective = diff > 5)
+         retrospective = diff > 7)
 
 
 all_models <- unique(df$model)
 all_dates <- unique(df$forecast_date)
 all_indicators <- unique(df$indicator)
+
+all_models <- all_models[all_models != "KIT-MeanEnsemble"]
 
 all_combinations <- expand.grid(
   model = all_models,
@@ -35,6 +37,18 @@ df_full <- all_combinations %>%
   )
 
 df_full <- df_full %>%
+  mutate(
+    status = case_when(
+      model %in% c("MPIDS-PS_embedding", "KIT-hhh4") & indicator == "are" ~ "Prospective",
+      model == "KIT-simple_nowcast" & indicator == "rsv"                  ~ "Prospective",
+      model %in% c("RIVM-GAM", "KIT-epinowcast") & forecast_date == as.Date("2024-11-21") & 
+        indicator == "influenza"   ~ "Data unavailable",
+      TRUE ~ status
+    )
+  )
+
+
+df_full <- df_full %>%
   group_by(model, indicator) %>%
   filter(any(status != "Missing"),
          indicator != 'pneumococcal') %>%
@@ -42,13 +56,26 @@ df_full <- df_full %>%
   )) %>% 
   ungroup()
 
+# save for selection of models for ensemble computation
+write_csv(
+  df_full,
+  "code/ensemble/model_availability.csv"
+)
+
 df_full <- df_full %>%
-  mutate(indicator = recode(indicator,
-                            "are" = "ARE",
-                            "sari" = "SARI",
-                            "influenza" = "Influenza",
-                            "rsv" = "RSV"
-  ))
+  mutate(
+    indicator = factor(
+      recode(
+        indicator,
+        "are"        = "ARI",
+        "sari"       = "SARI",
+        "influenza"  = "Influenza",
+        "rsv"        = "RSV"
+      ),
+      levels = c("ARI", "SARI", "Influenza", "RSV")
+    )
+  )
+
 
 # Plot with faceting by indicator
 ggplot(df_full, aes(x = forecast_date, y = model, fill = status)) +
@@ -56,7 +83,14 @@ ggplot(df_full, aes(x = forecast_date, y = model, fill = status)) +
   scale_fill_manual(values = c(
     "Prospective" = "forestgreen",
     "Retrospective" = "gold",
-    "Missing" = "red"
+    "Missing" = "red",
+    "Data unavailable" = "gray60"
+  ),
+  breaks = c(
+    "Prospective",
+    "Retrospective",
+    "Missing",
+    "Data unavailable"
   )) +
   facet_grid(indicator ~ ., scales = "free_y", space = "free_y") +
   theme_bw() +
