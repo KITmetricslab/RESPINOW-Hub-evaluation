@@ -13,7 +13,7 @@ custom_theme <- theme(
   axis.title = element_text(size = 10),
   axis.text.x = element_text(size = 8, angle = 90, hjust = 1, vjust = 0.5),
   axis.text.y = element_text(size = 8),
-  axis.line = element_line(linewidth = 0.2),
+  axis.line  = element_blank(),
   axis.ticks = element_line(linewidth = 0.2),
   panel.grid.major = element_line(linewidth = 0.2),
   panel.grid.minor = element_blank(),
@@ -22,7 +22,7 @@ custom_theme <- theme(
 )
 
 
-plot_total_scores <- function(df_long, models = NULL) {
+plot_wis_by_level <- function(df_long, models = NULL) {
   if (!is.null(models)) {
     df_long <- df_long %>% filter(model %in% models)
   }
@@ -122,11 +122,11 @@ plot_wis <- function(disease, export = TRUE) {
   
   p_nat <- df %>%
     filter(level == "national") %>%
-    plot_total_scores()
+    plot_wis_by_level()
   
   p_age <- df %>%
     filter(level == "age") %>%
-    plot_total_scores()
+    plot_wis_by_level()
   
   p <- p_nat + p_age + patchwork::plot_layout(guides = "collect")
   
