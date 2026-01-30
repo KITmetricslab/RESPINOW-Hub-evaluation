@@ -1,5 +1,7 @@
 source("code/data_utils.R")
 
+# FIGURE 1
+
 t1 <- load_combined_series('sari')
 t2 <- load_combined_series('are')
 t3 <- load_combined_series('influenza')
@@ -27,7 +29,15 @@ date_range_common <- ts %>%
 
 # Filter to the common date range
 ts <- ts %>%
-  filter(date >= date_range_common$start, date <= date_range_common$end)
+  filter(date >= date_range_common$start, date <= '2025-08-31') #date <= date_range_common$end)
+
+ts <- ts %>%
+  mutate(
+    indicator = factor(
+      indicator,
+      levels = c("are", "sari", "influenza", "rsv")
+    )
+  )
 
 # Pivot to wide format (one column per indicator)
 # ts_wide <- ts %>%
@@ -45,15 +55,15 @@ custom_theme <- theme(
 
 facet_labels <- c(
   "sari" = "SARI",
-  "are" = "ARE",
-  "influenza" = "Influenza",
-  "rsv" = "RSV"
+  "are" = "ARI",
+  "influenza" = "Seasonal influenza (SurvStat)",
+  "rsv" = "RSV (SurvStat)"
 )
 
 highlight_areas <- tibble(
-  xmin = as.Date(c("2023-11-16", "2024-10-17")),
-  xmax = as.Date(c("2024-09-12", "2025-03-27")),
-  period = c("Retrospective", "Prospective")
+  xmin = as.Date(c("2024-10-17")),
+  xmax = as.Date(c("2025-03-27")),
+  period = c("Evaluation period")
 )
 
 plot <- ggplot() +
@@ -84,8 +94,8 @@ plot <- ggplot() +
   
   # Define manual colors for shaded periods
   scale_fill_manual(
-    values = c("Retrospective" = "green", "Prospective" = "blue"),
-    limits = c("Retrospective", "Prospective")
+    values = c("Evaluation period" = "blue"),
+    limits = c("Evaluation period")
   ) +
   
   scale_y_continuous(labels = function(x) format(x, scientific = FALSE)) +
@@ -112,6 +122,10 @@ plot <- ggplot() +
 plot
 
 ggsave("figures/timeseries.pdf", width = 190.5, height = 110, unit = "mm", device = "pdf")
+
+
+
+
 
 
 ### Revisions
@@ -174,7 +188,7 @@ dates <- format(seq(as.Date("2023-01-01"), as.Date("2024-04-28"), by = "4 weeks"
 df_all <- map_dfr(dates, function(d) {
   cat(d, "\n")
   
-  df_temp <- load_combined_series('sari', as_of=d, drop_incomplete = FALSE) %>%
+  df_temp <- load_combined_series('rsv', as_of=d, drop_incomplete = FALSE) %>%
     # select("date", "icosari-sari-DE") %>%
     filter(date >= as.Date("2022-11-06"),
            age_group == "DE") %>%
@@ -223,6 +237,14 @@ plot <- ggplot(df_all, aes(x = date, y = value, group = data_version, color = co
 plot
 
 ggsave("figures/revisions.pdf", width = 190.5, height = 110, unit = "mm", device = "pdf")
+
+
+
+
+
+
+
+
 
 
 ### Multiple indicators
