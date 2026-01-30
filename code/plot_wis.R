@@ -59,7 +59,13 @@ custom_theme <- theme(
   legend.text = element_text(size = 8),
   axis.title = element_text(size = 10),
   axis.text.x = element_text(size = 8, angle = 90, hjust = 1, vjust = 0.5),
-  axis.text.y = element_text(size = 8)
+  axis.text.y = element_text(size = 8),
+  axis.line = element_line(linewidth = 0.25),
+  axis.ticks = element_line(linewidth = 0.25),
+  panel.grid.major = element_line(linewidth = 0.2),
+  panel.grid.minor = element_blank(),
+  strip.background = element_rect(linewidth = 0.25),
+  panel.border = element_rect(linewidth = 0.2)
 )
 
 MODEL_ORDER <- c(
@@ -79,7 +85,8 @@ MODEL_ORDER <- c(
   "KIT-hhh4",
   "MPIDS-PS_embedding",
   "HZI-ODEmodel",
-  "baseline"
+  "baseline",
+  "KIT-persistence"
 )
 
 MODEL_COLORS <- c(
@@ -106,8 +113,35 @@ MODEL_COLORS <- c(
   "HZI-ODEmodel"           = "#6A3D9A", 
   
   # Baseline
-  "baseline"               = "#000000"
+  "baseline"               = "#000000",
+  "KIT-persistence"        = "#382e11"
 )
+
+MODEL_LABELS <- c(
+  # Nowcasts
+  "KIT-EnsembleNowcastRealtime"  = "EnsembleRealtime",
+  "KIT-EnsembleNowcastComplete"  = "EnsembleComplete",
+  "KIT-simple_nowcast"           = "SimpleNowcast",
+  "KIT-epinowcast"               = "EpiNowcast",
+  
+  # Forecasts (collapsed)
+  "KIT-EnsembleRealtime"         = "EnsembleRealtime",
+  "KIT-EnsembleComplete"         = "EnsembleComplete",
+  
+  # Other models
+  "KIT-LightGBM"                 = "LightGBM",
+  "KIT-TSMixer"                  = "TSMixer",
+  "KIT-hhh4"                     = "hhh4",
+  "MPIDS-PS_embedding"           = "PS-Embedding",
+  "RIVM-GAM"                     = "RIVM-GAM",
+  "RKI-Pilot_01"                 = "RKI-Pilot",
+  "HZI-ODEmodel"                 = "ODEmodel",
+  
+  # Baselines
+  "baseline"                     = "Historical",
+  "KIT-persistence"              = "Persistence"
+)
+
 
 
 plot_total_scores <- function(df_long, models = NULL) {
@@ -138,6 +172,7 @@ plot_total_scores <- function(df_long, models = NULL) {
       fill = "white",
       stat = "identity",
       width = 0.7,
+      linewidth = 0.2,
       show.legend = FALSE
     ) +
     geom_bar(
@@ -145,7 +180,7 @@ plot_total_scores <- function(df_long, models = NULL) {
       aes(x = model, y = value, fill = model, alpha = metric, color = model),
       stat = "identity",
       width = 0.7,
-      size = 0.1,
+      linewidth = 0.2,
       show.legend = TRUE
     ) +
     facet_nested(
@@ -165,6 +200,7 @@ plot_total_scores <- function(df_long, models = NULL) {
     ) +
     scale_color_manual(values = MODEL_COLORS, guide = "none") +
     scale_fill_manual(values = MODEL_COLORS, guide = "none") +
+    scale_x_discrete(labels = MODEL_LABELS) +
     #scale_x_discrete(drop = TRUE) +
     scale_alpha_discrete(
       labels = c(
@@ -190,39 +226,6 @@ plot_total_scores <- function(df_long, models = NULL) {
   return(p)
 }
 
-
-
-# disease  = "are"
-# level = "age"
-# 
-# df_scores <- load_scores(diseases = disease, by_horizon = FALSE) %>% 
-#   filter(level == !!level) %>% 
-#   mutate(kind = factor(ifelse(model %in% NOWCAST_MODELS, "Nowcast", "Forecast"), 
-#                        levels = c("Nowcast", "Forecast")))
-# 
-# df_scores_long <- df_scores %>%
-#   pivot_longer(
-#     cols = c(wis, underprediction, spread, overprediction),
-#     names_to = "metric",
-#     values_to = "value"
-#   )
-# 
-# p <- plot_total_scores(df_scores_long)
-# p
-# 
-# g <- plot_total_scores(df_scores_long)
-# g
-# 
-# p + g + plot_layout(guides = "collect")
-# 
-# ggsave(
-#   paste0("figures/wis_", disease, ".pdf"),
-#   plot = p,
-#   width = 190.5,
-#   height = 110,
-#   unit = "mm",
-#   device = "pdf"
-# )
 
 plot_wis <- function(disease, export = TRUE) {
   
@@ -267,4 +270,442 @@ plot_wis("are")
 plot_wis("sari")
 plot_wis("rsv")
 plot_wis("influenza")
+
+
+
+### WIS by horizon
+
+plot_wis_by_horizon <- function(df_scores_long){
+  
+  model_order <- MODEL_ORDER[MODEL_ORDER %in% unique(df_scores_long$model)]
+  df_scores_long <- df_scores_long %>%
+    mutate(model = factor(model, levels = model_order, ordered = TRUE))
+  
+  # Separate data for WIS and components
+  scores_wis <- df_scores_long %>% filter(metric == "wis")
+  scores_components <- df_scores_long %>% filter(metric != "wis")
+  
+  
+  p <- ggplot() +
+    geom_bar(
+      data = scores_wis,
+      aes(x = model, y = value, color = model),
+      fill = "white",
+      stat = "identity",
+      width = 0.7,
+      linewidth = 0.2,
+      show.legend = FALSE
+    ) +
+    geom_bar(
+      data = scores_components,
+      aes(x = model, y = value, fill = model, alpha = metric),
+      stat = "identity",
+      width = 0.7,
+      linewidth = 0.2,
+      show.legend = TRUE
+    ) +
+    scale_color_manual(values = MODEL_COLORS, guide = "none") +
+    scale_fill_manual(values = MODEL_COLORS, guide = "none") +
+    scale_x_discrete(labels = MODEL_LABELS) +
+    scale_alpha_discrete(
+      labels = c(
+        "overprediction" = "Overprediction",
+        "spread" = "Spread",
+        "underprediction" = "Underprediction"
+      ),
+      guide = guide_legend(reverse = FALSE)
+    ) +
+    labs(
+      x = NULL,
+      y = "WIS",
+      color = "Model",
+      alpha = "Decomposition of WIS:",
+      title = NULL #toupper(first(scores_wis$disease))
+    ) +
+    facet_grid(
+      level ~ horizon,
+      scales = "free",
+      space = "free_x",
+      labeller = labeller(level = LEVEL_LABELS)
+    ) +
+    theme_bw() +
+    custom_theme +
+    theme(
+      legend.position = "bottom",
+      strip.text = element_text(size = 9)
+    )
+  
+  return(p)
+}
+
+plot_wis_by_horizon_disease <- function(disease, export = TRUE) {
+  
+  df_scores_long <- load_scores(diseases = disease, by_horizon = TRUE) %>%
+    filter(level != "states") %>% 
+    pivot_longer(
+      cols = c(wis, underprediction, spread, overprediction),
+      names_to = "metric",
+      values_to = "value"
+    )
+  
+  p <- plot_wis_by_horizon(df_scores_long)
+  
+  if (export) {
+    ggsave(
+      paste0("figures/wis_by_horizon_", disease, ".pdf"),
+      plot = p,
+      width = 190.5,
+      height = 110,
+      units = "mm"
+    )
+  }
+  
+  p
+}
+
+plot_wis_by_horizon_disease("sari")
+plot_wis_by_horizon_disease("are")
+plot_wis_by_horizon_disease("influenza")
+plot_wis_by_horizon_disease("rsv")
+
+
+
+
+### By age group
+
+plot_wis_by_age <- function(scores) {
+  model_order <- MODEL_ORDER[MODEL_ORDER %in% unique(scores$model)]
+  scores <- scores %>%
+    mutate(model = factor(model, levels = model_order, ordered = TRUE))
+  
+  # Separate data for WIS and components
+  scores_wis <- scores %>% filter(metric == "wis")
+  scores_components <- scores %>% filter(metric != "wis")
+  
+  p <- ggplot() +
+    geom_bar(
+      data = scores_wis,
+      aes(x = model, y = value, color = model),
+      fill = "white",
+      stat = "identity",
+      width = 0.7,
+      linewidth = 0.2,
+      show.legend = FALSE
+    ) +
+    geom_bar(
+      data = scores_components,
+      aes(x = model, y = value, fill = model, alpha = metric),
+      stat = "identity",
+      width = 0.7,
+      linewidth = 0.2,
+      show.legend = TRUE
+    ) +
+    scale_color_manual(values = MODEL_COLORS, guide = "none") +
+    scale_fill_manual(values = MODEL_COLORS, guide = "none") +
+    scale_x_discrete(labels = MODEL_LABELS) +
+    scale_alpha_discrete(
+      labels = c(
+        "overprediction" = "Overprediction",
+        "spread" = "Spread",
+        "underprediction" = "Underprediction"
+      ),
+      guide = guide_legend(reverse = FALSE)
+    ) +
+    labs(
+      x = NULL,
+      y = "WIS",
+      alpha = "Decomposition of WIS:",
+      title = NULL #toupper(first(scores_wis$disease))
+    ) +
+    facet_wrap("age_group", scales = "free_y") +
+    theme_bw() +
+    custom_theme +
+    theme(
+      legend.position = "bottom"
+      # axis.text.x = element_text(size = 7, angle = 90, hjust = 0.5, vjust = 0.5),
+      # axis.text.y = element_text(size = 7)
+    )
+}
+
+plot_wis_by_age_disease <- function(disease, export = TRUE) {
+  
+  scores <- load_scores(diseases = disease, by_age = TRUE) %>%
+    filter(age_group != "00+") %>%
+    pivot_longer(
+      cols = c(wis, underprediction, spread, overprediction),
+      names_to = "metric",
+      values_to = "value"
+    )
+  
+  p <- plot_wis_by_age(scores)
+  
+  if (export) {
+    ggsave(
+      paste0("figures/wis_by_age_", disease, ".pdf"),
+      plot = p,
+      width = 160,
+      height = 120,
+      units = "mm",
+      device = "pdf"
+    )
+  }
+  
+  p
+}
+
+plot_wis_by_age_disease("sari")
+plot_wis_by_age_disease("are")
+
+
+###
+
+
+plot_wis_by_age_nested <- function(df_long, models = NULL) {
+  
+  if (!is.null(models)) {
+    df_long <- df_long %>% filter(model %in% models)
+  }
+  
+  model_order <- MODEL_ORDER[MODEL_ORDER %in% unique(df_long$model)]
+  df_long <- df_long %>%
+    mutate(model = factor(model, levels = model_order, ordered = TRUE))
+  
+  df_wis <- df_long %>% filter(metric == "wis")
+  df_components <- df_long %>% filter(metric != "wis")
+  
+  p <- ggplot() +
+    geom_bar(
+      data = df_wis,
+      aes(x = model, y = value, color = model),
+      fill = "white",
+      stat = "identity",
+      width = 0.7,
+      linewidth = 0.2,
+      show.legend = FALSE
+    ) +
+    geom_bar(
+      data = df_components,
+      aes(x = model, y = value, fill = model, alpha = metric, color = model),
+      stat = "identity",
+      width = 0.7,
+      linewidth = 0.2,
+      show.legend = TRUE
+    ) +
+    facet_nested(
+      ~ age_group + kind,
+      scales = "free_x",
+      space = "free_x",
+      ncol = 3,
+      labeller = labeller(
+        kind = function(x) rep("", length(x))
+      ),
+      strip = strip_nested(
+        background_x = c(
+          element_rect(),
+          element_blank()
+        ),
+        by_layer_x = TRUE
+      ),
+      drop = TRUE
+    ) +
+    scale_color_manual(values = MODEL_COLORS, labels = MODEL_LABELS, guide = "none") +
+    scale_fill_manual(values = MODEL_COLORS, labels = MODEL_LABELS, guide = "none") +
+    scale_x_discrete(labels = MODEL_LABELS) +
+    scale_alpha_discrete(
+      labels = c(
+        "overprediction" = "Overprediction",
+        "spread" = "Spread",
+        "underprediction" = "Underprediction"
+      ),
+      guide = guide_legend(reverse = FALSE)
+    ) +
+    labs(
+      x = NULL,
+      y = "WIS",
+      alpha = "Decomposition of WIS:",
+      title = NULL
+    ) +
+    theme_bw() +
+    custom_theme +
+    theme(
+      legend.position = "right"
+    )
+  
+  p
+}
+
+
+plot_wis_by_age_nested_disease <- function(disease, export = TRUE) {
+  
+  df_long <- load_scores(diseases = disease, by_age = TRUE) %>%
+    filter(age_group != "00+") %>%
+    mutate(
+      kind = factor(
+        ifelse(model %in% NOWCAST_MODELS, "Nowcast", "Forecast"),
+        levels = c("Nowcast", "Forecast")
+      )
+    ) %>%
+    pivot_longer(
+      cols = c(wis, underprediction, spread, overprediction),
+      names_to = "metric",
+      values_to = "value"
+    )
+  
+  p <- plot_wis_by_age_nested(df_long)
+  
+  if (export) {
+    ggsave(
+      paste0("figures/wis_by_age_", disease, ".pdf"),
+      plot = p,
+      width = 160,
+      height = 120,
+      units = "mm",
+      device = "pdf"
+    )
+  }
+  
+  p
+}
+
+plot_wis_by_age_nested_disease("sari")
+
+
+
+plot_wis_by_age_patchwork <- function(disease, export = TRUE) {
+  
+  df_long <- load_scores(diseases = disease, by_age = TRUE) %>%
+    filter(age_group != "00+") %>%
+    mutate(
+      kind = factor(
+        ifelse(model %in% NOWCAST_MODELS, "Nowcast", "Forecast"),
+        levels = c("Nowcast", "Forecast")
+      )
+    ) %>%
+    pivot_longer(
+      cols = c(wis, underprediction, spread, overprediction),
+      names_to = "metric",
+      values_to = "value"
+    )
+  
+  model_order <- MODEL_ORDER[MODEL_ORDER %in% unique(df_long$model)]
+  df_long <- df_long %>%
+    mutate(model = factor(model, levels = model_order, ordered = TRUE))
+  
+  age_groups <- unique(df_long$age_group)
+  
+  plots <- lapply(age_groups, function(ag) {
+    
+    d <- df_long %>% filter(age_group == ag)
+    
+    d_wis <- d %>% filter(metric == "wis")
+    d_comp <- d %>% filter(metric != "wis")
+    
+    ggplot() +
+      geom_bar(
+        data = d_wis,
+        aes(x = model, y = value, color = model),
+        fill = "white",
+        stat = "identity",
+        width = 0.7,
+        linewidth = 0.2,
+        show.legend = FALSE
+      ) +
+      geom_bar(
+        data = d_comp,
+        aes(x = model, y = value, fill = model, alpha = metric, color = model),
+        stat = "identity",
+        width = 0.7,
+        linewidth = 0.2,
+        show.legend = TRUE
+      ) +
+      facet_nested(
+        ~ kind + age_group,
+        scales = "free",
+        space = "free_x",
+        remove_labels = TRUE,
+        labeller = labeller(
+          age_group = function(x) x,
+          kind = function(x) rep("", length(x))  # hide inner strip text
+        ),
+        strip = strip_nested(
+          background_x = c(element_blank(), element_rect()),
+          by_layer_x = TRUE
+        ),
+        drop = TRUE
+      ) +
+      scale_color_manual(values = MODEL_COLORS, labels = MODEL_LABELS, guide = "none") +
+      scale_fill_manual(values = MODEL_COLORS, labels = MODEL_LABELS, guide = "none") +
+      scale_x_discrete(labels = MODEL_LABELS) +
+      scale_alpha_discrete(
+        labels = c(
+          "overprediction" = "Overprediction",
+          "spread" = "Spread",
+          "underprediction" = "Underprediction"
+        ),
+        guide = guide_legend(reverse = FALSE)
+      ) +
+      labs(
+        x = NULL,
+        y = "WIS",
+        alpha = "Decomposition of WIS:",
+        title = NULL
+      ) +
+      theme_bw() +
+      custom_theme +
+      theme(
+        plot.margin = margin(t = -20, r = 4, b = -20, l = 2), # to remove some whitespace from the top!
+        strip.text = element_text(size = 9)
+      )
+  })
+  
+  
+  if (length(plots) == 5) {
+    
+    # layout:
+    # row1: p1 p2 legend
+    # row2: p3 p4 p5 (so x labels are in the same row otherwise weird white space)
+    p <- wrap_plots(
+      c(plots[[1]], plots[[2]], guide_area(),
+        plots[[3]], plots[[4]], plots[[5]]),
+      ncol = 3
+    ) +
+      plot_layout(
+        guides = "collect",
+        axes = "collect_x",
+        axis_titles = "collect"
+      ) &
+      theme(legend.position = "right")
+    
+    
+  } else {
+    
+    p <- wrap_plots(
+      plots,
+      ncol = 3,
+      guides = "collect",
+      axes = "collect_x",
+      axis_titles = "collect"
+    ) &
+      theme(legend.position = "bottom")
+  }
+  
+  
+  if (export) {
+    ggsave(
+      paste0("figures/wis_by_age_", disease, ".pdf"),
+      plot = p,
+      width = 190.5,
+      height = 140,
+      units = "mm",
+      device = "pdf"
+    )
+  }
+  
+  p
+}
+
+plot_wis_by_age_patchwork("sari")
+plot_wis_by_age_patchwork("are")
+plot_wis_by_age_patchwork("rsv")
+plot_wis_by_age_patchwork("influenza")
 
