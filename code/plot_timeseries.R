@@ -181,14 +181,14 @@ plot <- ggplot(df_all, aes(x = date, y = value, color = data_version)) +
 plot
 
 
-### Revisions all
+### Revisions all - FIGURE 2
 
 dates <- format(seq(as.Date("2023-01-01"), as.Date("2024-04-28"), by = "4 weeks"), "%Y-%m-%d")
 
 df_all <- map_dfr(dates, function(d) {
   cat(d, "\n")
   
-  df_temp <- load_combined_series('rsv', as_of=d, drop_incomplete = FALSE) %>%
+  df_temp <- load_combined_series('sari', as_of=d, drop_incomplete = FALSE) %>%  # CHANGE INDICATOR HERE SARI/ARE/RSV/INFLUENZA
     # select("date", "icosari-sari-DE") %>%
     filter(date >= as.Date("2022-11-06"),
            age_group == "DE") %>%
@@ -247,7 +247,7 @@ ggsave("figures/revisions.pdf", width = 190.5, height = 110, unit = "mm", device
 
 
 
-### Multiple indicators
+### Multiple indicators - DOES NOT WORK COMPLETELY
 
 
 indicators <- c("sari", "are", "influenza", "rsv")
