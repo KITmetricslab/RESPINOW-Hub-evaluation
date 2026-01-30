@@ -1,6 +1,8 @@
 source("code/data_utils.R")
 Sys.setlocale("LC_ALL", "C")
 
+# FIGURE 4
+
 custom_theme <- theme(
   plot.title = element_text(size = 11),
   strip.text = element_text(size = 10),
@@ -186,7 +188,7 @@ ggplot(truth_sari) +
 # =========================
 # SETTINGS
 # =========================
-model      <- "KIT-Ensemble"
+model      <- "KIT-EnsembleComplete"
 age_group  <- "00+"
 indicators <- c("sari", "are")
 
