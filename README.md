@@ -18,4 +18,4 @@ This repository contains the evaluation pipeline for nowcasts and forecasts subm
 
 3. **Visualize results**  
    The computed scores can be visualized using  
-   `code/evaluation.R`.
+   `code/plot_wis.R` and `code/plot_coverage.R`.
