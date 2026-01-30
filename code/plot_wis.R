@@ -1,8 +1,10 @@
 library(tidyverse)
-library(ggh4x) # for facet_nested
-library(patchwork) # to combine individual plots
+library(ggh4x) # for facet_nested, used to separate nowcasts and forecasts
+library(patchwork) # to combine plots, align them nicely and combine legends/axis titles
 
 source("code/config.R")
+
+options(scipen = 999) # turn off scientific notation
 
 NOWCAST_MODELS <- c("KIT-simple_nowcast", "KIT-epinowcast", "RIVM-GAM", "RKI-Pilot_01",
                     "KIT-EnsembleNowcastRealtime", "KIT-EnsembleNowcastComplete")
@@ -373,205 +375,7 @@ plot_wis_by_horizon_disease("rsv")
 
 ### By age group
 
-plot_wis_by_age <- function(scores) {
-  model_order <- MODEL_ORDER[MODEL_ORDER %in% unique(scores$model)]
-  scores <- scores %>%
-    mutate(model = factor(model, levels = model_order, ordered = TRUE))
-  
-  # Separate data for WIS and components
-  scores_wis <- scores %>% filter(metric == "wis")
-  scores_components <- scores %>% filter(metric != "wis")
-  
-  p <- ggplot() +
-    geom_bar(
-      data = scores_wis,
-      aes(x = model, y = value, color = model),
-      fill = "white",
-      stat = "identity",
-      width = 0.7,
-      linewidth = 0.2,
-      show.legend = FALSE
-    ) +
-    geom_bar(
-      data = scores_components,
-      aes(x = model, y = value, fill = model, alpha = metric),
-      stat = "identity",
-      width = 0.7,
-      linewidth = 0.2,
-      show.legend = TRUE
-    ) +
-    scale_color_manual(values = MODEL_COLORS, guide = "none") +
-    scale_fill_manual(values = MODEL_COLORS, guide = "none") +
-    scale_x_discrete(labels = MODEL_LABELS) +
-    scale_alpha_discrete(
-      labels = c(
-        "overprediction" = "Overprediction",
-        "spread" = "Spread",
-        "underprediction" = "Underprediction"
-      ),
-      guide = guide_legend(reverse = FALSE)
-    ) +
-    labs(
-      x = NULL,
-      y = "WIS",
-      alpha = "Decomposition of WIS:",
-      title = NULL #toupper(first(scores_wis$disease))
-    ) +
-    facet_wrap("age_group", scales = "free_y") +
-    theme_bw() +
-    custom_theme +
-    theme(
-      legend.position = "bottom"
-      # axis.text.x = element_text(size = 7, angle = 90, hjust = 0.5, vjust = 0.5),
-      # axis.text.y = element_text(size = 7)
-    )
-}
-
-plot_wis_by_age_disease <- function(disease, export = TRUE) {
-  
-  scores <- load_scores(diseases = disease, by_age = TRUE) %>%
-    filter(age_group != "00+") %>%
-    pivot_longer(
-      cols = c(wis, underprediction, spread, overprediction),
-      names_to = "metric",
-      values_to = "value"
-    )
-  
-  p <- plot_wis_by_age(scores)
-  
-  if (export) {
-    ggsave(
-      paste0("figures/wis_by_age_", disease, ".pdf"),
-      plot = p,
-      width = 160,
-      height = 120,
-      units = "mm",
-      device = "pdf"
-    )
-  }
-  
-  p
-}
-
-plot_wis_by_age_disease("sari")
-plot_wis_by_age_disease("are")
-
-
-###
-
-
-plot_wis_by_age_nested <- function(df_long, models = NULL) {
-  
-  if (!is.null(models)) {
-    df_long <- df_long %>% filter(model %in% models)
-  }
-  
-  model_order <- MODEL_ORDER[MODEL_ORDER %in% unique(df_long$model)]
-  df_long <- df_long %>%
-    mutate(model = factor(model, levels = model_order, ordered = TRUE))
-  
-  df_wis <- df_long %>% filter(metric == "wis")
-  df_components <- df_long %>% filter(metric != "wis")
-  
-  p <- ggplot() +
-    geom_bar(
-      data = df_wis,
-      aes(x = model, y = value, color = model),
-      fill = "white",
-      stat = "identity",
-      width = 0.7,
-      linewidth = 0.2,
-      show.legend = FALSE
-    ) +
-    geom_bar(
-      data = df_components,
-      aes(x = model, y = value, fill = model, alpha = metric, color = model),
-      stat = "identity",
-      width = 0.7,
-      linewidth = 0.2,
-      show.legend = TRUE
-    ) +
-    facet_nested(
-      ~ age_group + kind,
-      scales = "free_x",
-      space = "free_x",
-      ncol = 3,
-      labeller = labeller(
-        kind = function(x) rep("", length(x))
-      ),
-      strip = strip_nested(
-        background_x = c(
-          element_rect(),
-          element_blank()
-        ),
-        by_layer_x = TRUE
-      ),
-      drop = TRUE
-    ) +
-    scale_color_manual(values = MODEL_COLORS, labels = MODEL_LABELS, guide = "none") +
-    scale_fill_manual(values = MODEL_COLORS, labels = MODEL_LABELS, guide = "none") +
-    scale_x_discrete(labels = MODEL_LABELS) +
-    scale_alpha_discrete(
-      labels = c(
-        "overprediction" = "Overprediction",
-        "spread" = "Spread",
-        "underprediction" = "Underprediction"
-      ),
-      guide = guide_legend(reverse = FALSE)
-    ) +
-    labs(
-      x = NULL,
-      y = "WIS",
-      alpha = "Decomposition of WIS:",
-      title = NULL
-    ) +
-    theme_bw() +
-    custom_theme +
-    theme(
-      legend.position = "right"
-    )
-  
-  p
-}
-
-
-plot_wis_by_age_nested_disease <- function(disease, export = TRUE) {
-  
-  df_long <- load_scores(diseases = disease, by_age = TRUE) %>%
-    filter(age_group != "00+") %>%
-    mutate(
-      kind = factor(
-        ifelse(model %in% NOWCAST_MODELS, "Nowcast", "Forecast"),
-        levels = c("Nowcast", "Forecast")
-      )
-    ) %>%
-    pivot_longer(
-      cols = c(wis, underprediction, spread, overprediction),
-      names_to = "metric",
-      values_to = "value"
-    )
-  
-  p <- plot_wis_by_age_nested(df_long)
-  
-  if (export) {
-    ggsave(
-      paste0("figures/wis_by_age_", disease, ".pdf"),
-      plot = p,
-      width = 160,
-      height = 120,
-      units = "mm",
-      device = "pdf"
-    )
-  }
-  
-  p
-}
-
-plot_wis_by_age_nested_disease("sari")
-
-
-
-plot_wis_by_age_patchwork <- function(disease, export = TRUE) {
+plot_wis_by_age <- function(disease, export = TRUE) {
   
   df_long <- load_scores(diseases = disease, by_age = TRUE) %>%
     filter(age_group != "00+") %>%
@@ -704,8 +508,8 @@ plot_wis_by_age_patchwork <- function(disease, export = TRUE) {
   p
 }
 
-plot_wis_by_age_patchwork("sari")
-plot_wis_by_age_patchwork("are")
-plot_wis_by_age_patchwork("rsv")
-plot_wis_by_age_patchwork("influenza")
+plot_wis_by_age("sari")
+plot_wis_by_age("are")
+plot_wis_by_age("rsv")
+plot_wis_by_age("influenza")
 
