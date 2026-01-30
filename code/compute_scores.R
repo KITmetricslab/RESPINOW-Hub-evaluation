@@ -22,3 +22,6 @@ df_scores <- left_join(
 )
 
 write_csv(df_scores, "data/scores.csv")
+
+
+
