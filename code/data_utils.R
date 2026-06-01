@@ -1,6 +1,9 @@
+# This file contains functions to load various types of data convenently
+
 source("code/config.R")
 library(tidyverse)
 
+# load target time series:
 load_targets <- function() {
   names(SOURCE_DICT) %>%
     map_dfr(~{
@@ -14,6 +17,7 @@ load_targets <- function() {
     })
 }
 
+# add relevant columns / rows which are not in default format::
 add_target <- function(df) {
   df_target <- load_targets()
   
@@ -31,6 +35,7 @@ add_median <- function(df) {
   bind_rows(df, df_median)
 }
 
+# load submissions:
 load_submissions <- function(include_target = TRUE, include_median = TRUE) {
   df <- read_csv("data/submissions.csv", show_col_types = FALSE)
   
@@ -46,7 +51,7 @@ load_submissions <- function(include_target = TRUE, include_median = TRUE) {
 }
 
 ###
-
+# load consolidated time series:
 load_latest_series <- function(indicator = "sari", wide=TRUE) {
   source <- SOURCE_DICT[[indicator]]
   
@@ -94,6 +99,7 @@ load_latest_series <- function(indicator = "sari", wide=TRUE) {
   }
 }
 
+# load reporting triangle:
 load_rt <- function(indicator = "sari", preprocessed = FALSE) {
   source <- SOURCE_DICT[[indicator]]
   
@@ -109,6 +115,7 @@ load_rt <- function(indicator = "sari", preprocessed = FALSE) {
   return(rt)
 }
 
+# replace last (= incomplete) values to NA
 set_last_n_values_to_na <- function(group) {
   n <- nrow(group)
   for (i in 1:4) {
@@ -120,6 +127,7 @@ set_last_n_values_to_na <- function(group) {
   return(group)
 }
 
+# get target time series as of a given date
 target_as_of <- function(rt, date) {
   date <- as.Date(date)
   
@@ -137,6 +145,7 @@ target_as_of <- function(rt, date) {
   return(rt_temp)
 }
 
+# load target series, i.e. with 4 weeks of completion
 load_target_series <- function(indicator = "sari", as_of = NULL, age_group = NULL, wide=TRUE) {
   source <- SOURCE_DICT[[indicator]]
   
@@ -198,6 +207,10 @@ load_target_series <- function(indicator = "sari", as_of = NULL, age_group = NUL
   
 }
 
+
+# load a combination of consolidated and real-time data
+# needed as real-time snapshots don't go all the way back,
+# so we use consolidated for that part.
 load_combined_series <- function(indicator = "sari", as_of = NULL, drop_incomplete = TRUE, wide=FALSE) {
   source <- SOURCE_DICT[[indicator]]
   
@@ -223,33 +236,8 @@ load_combined_series <- function(indicator = "sari", as_of = NULL, drop_incomple
   return(ts_combined)
 }
 
-# load_submission_wide <- function(date,
-#                                model = "KIT-MeanEnsemble", #"KIT-simple_nowcast"
-#                                disease = "sari",
-#                                location = "DE",
-#                                age_group = "00+") {
-#   source <- SOURCE_DICT[[disease]]
-#   
-#   file_path <- glue::glue("submissions/{source}/{disease}/{model}/{date}-{source}-{disease}-{model}.csv")
-#   
-#   readr::read_csv(file_path, show_col_types = FALSE) %>%
-#     filter(
-#       location == !!location,
-#       age_group == !!age_group,
-#       type == "quantile"
-#     ) %>%
-#     pivot_wider(
-#       names_from = quantile,
-#       values_from = value,
-#       names_prefix = "quantile_"
-#     ) %>%
-#     relocate(location, age_group, target_end_date, forecast_date, horizon)
-# }
 
-#m <- load_submission_wide("2024-10-24", "KIT-simple_nowcast", "are")
-
-
-
+# load scores:
 load_scores <- function(
     diseases = c("sari", "are"),
     by_age = FALSE,
@@ -284,7 +272,7 @@ load_scores <- function(
     group_by(across(all_of(group_cols))) %>%
     summarise(
       across(
-        c(spread, overprediction, underprediction, wis, c50, c95),
+        c(spread, overprediction, underprediction, wis, c50, c95, ae),
         mean,
         na.rm = TRUE
       ),

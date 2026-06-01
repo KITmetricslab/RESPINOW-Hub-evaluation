@@ -1,5 +1,9 @@
+# In this file all submitted nowcasts and forecasts are loaded and preprocessed.
+# The processed submissions are stored in `data/submissions.csv`.
+
 library(tidyverse)
 
+# function to list all submissions in a data.frame:
 list_submissions <- function() {
   root_dir <- "submissions"
 
@@ -40,17 +44,21 @@ list_submissions <- function() {
     )
 }
 
+# list all submissions:
 df <- list_submissions()
 
-df %>%
+# check completeness:
+summ <- df %>%
   group_by(source, disease, model) %>%
   summarise(n_dates = n_distinct(date), .groups = "drop")
+# 22 for all. 21 for two models in survstat can be ignored as we do not compute scores here.
 
-
+# function to pool all submissions into one data.frame
 combine_submissions <- function() {
   d <- list_submissions()
   df <- data.frame()
 
+  # run through submission files:
   for (i in seq_len(nrow(d))) {
     row <- d[i, ]
 
@@ -84,6 +92,7 @@ combine_submissions <- function() {
   return(df)
 }
 
+# helper function to distinguish between national level and age groups ("level"):
 determine_level <- function(df) {
   df %>%
     mutate(
@@ -96,7 +105,10 @@ determine_level <- function(df) {
     )
 }
 
+# collect all submissions:
 df <- combine_submissions()
+# add level:
 df <- determine_level(df)
 
+# write out results:
 write_csv(df, "data/submissions.csv")

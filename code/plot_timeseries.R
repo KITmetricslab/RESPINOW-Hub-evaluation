@@ -1,15 +1,20 @@
+# In this file, descriptive plots of the time series are generated.
+
+# load utility functions
 source("code/data_utils.R")
 
 # FIGURE 1
 
-t1 <- load_combined_series('sari')
-t2 <- load_combined_series('are')
-t3 <- load_combined_series('influenza')
-t4 <- load_combined_series('rsv')
+# load time series:
+# t1 <- load_combined_series('sari')
+# t2 <- load_combined_series('are')
+# t3 <- load_combined_series('influenza')
+# t4 <- load_combined_series('rsv')
 
-
+# names of indicators:
 indicators <- c("sari", "are", "influenza", "rsv")
 
+# load time series for all indicators:
 ts <- indicators %>%
   set_names() %>%
   map_dfr(function(indicator) {
@@ -38,11 +43,15 @@ ts <- ts %>%
       levels = c("are", "sari", "influenza", "rsv")
     )
   )
+# add an indicator to grey out incomplete rsv values
+ts$grey_out <- ts$date <= as.Date("2023-07-01") & ts$indicator == "rsv"
+
 
 # Pivot to wide format (one column per indicator)
 # ts_wide <- ts %>%
 #   pivot_wider(names_from = indicator, values_from = value)
 
+# define theme for plotting
 custom_theme <- theme(
   plot.title = element_text(size = 11),
   strip.text = element_text(size = 10),
@@ -53,6 +62,7 @@ custom_theme <- theme(
   axis.text.y = element_text(size = 8)
 )
 
+# define labels per time series / facet:
 facet_labels <- c(
   "sari" = "SARI",
   "are" = "ARI",
@@ -60,12 +70,14 @@ facet_labels <- c(
   "rsv" = "RSV (SurvStat)"
 )
 
+# define dates to highlight as the evaluation period
 highlight_areas <- tibble(
   xmin = as.Date(c("2024-10-17")),
   xmax = as.Date(c("2025-03-27")),
   period = c("Evaluation period")
 )
 
+# do the plotting
 plot <- ggplot() +
   
   # Highlight periods using geom_rect
@@ -78,10 +90,10 @@ plot <- ggplot() +
   # Time series line
   geom_line(
     data = ts,
-    aes(x = date, y = value),
+    aes(x = date, y = value, colour = grey_out),
     size = 0.6
   ) +
-  
+  scale_color_manual(values = c("TRUE" = "grey", "FALSE" = "black"), guide = "none") +
   # One facet per target
   facet_wrap(~indicator, scales = "free", labeller = as_labeller(facet_labels)) +
   expand_limits(y = 0) + 
@@ -100,7 +112,7 @@ plot <- ggplot() +
   
   scale_y_continuous(labels = function(x) format(x, scientific = FALSE)) +
   
-  # Theme settings
+  # Additional theme settings
   theme_bw() +
   custom_theme +
   theme(
@@ -121,18 +133,46 @@ plot <- ggplot() +
 
 plot
 
+# save:
 ggsave("figures/timeseries.pdf", width = 190.5, height = 110, unit = "mm", device = "pdf")
 
 
+####################################################
+### a plot on the peak timing (not used in the manuscript)
+
+ts_sari <- ts %>% filter(indicator == "sari")
+ts_sari$season <- NA
+
+ts_sari$season[ts_sari$week >= 40] <- paste0(ts_sari$year[ts_sari$week >= 40], "/", ts_sari$year[ts_sari$week >= 40] + 1)
+ts_sari$season[ts_sari$week < 40] <- paste0(ts_sari$year[ts_sari$week < 40] - 1, "/", ts_sari$year[ts_sari$week < 40])
+
+ts_sari$season_week <- NA
+ts_sari$season_week[ts_sari$week >= 40] <- ts_sari$week[ts_sari$week >= 40] - 40
+ts_sari$season_week[ts_sari$week < 40] <- ts_sari$week[ts_sari$week < 40] - 40 + 52
+ts
+
+ts_sari_max <- ts_sari %>% group_by(season) %>% summarise(max = max(value), peak_week = season_week[which.max(value)])
+
+ts_sari_last <- ts_sari %>% filter(season == "2024/2025")
+
+ggplot() +
+  geom_line(data = ts_sari, aes(x = week, y = value, group = year))
+
+ggplot() +
+  geom_line(data = ts_sari, aes(x = season_week, y = value, group = season, colour = season)) +
+  geom_point(data = ts_sari_max, aes(x = peak_week, y = max))
 
 
 
+####################################################
+### PLot showing data revisions
 
-### Revisions
+### Overview plot in old style (not used in manuscript):
 
-
+# five dates to show:
 dates <- c("2023-09-03", "2023-10-01", "2023-11-05", "2023-12-03", "2024-01-07")
 
+# get all necessary data into one data.frame:
 df_all <- map_dfr(dates, function(d) {
   cat(d, "\n")
   
@@ -145,6 +185,7 @@ df_all <- map_dfr(dates, function(d) {
   return(df_temp)
 })
 
+# colors for different data versions:
 version_colors <- c(
   "2023-09-03" = "#1f77b4",  # Blue
   "2023-10-01" = "#ff7f0e",  # Orange
@@ -164,10 +205,6 @@ plot <- ggplot(df_all, aes(x = date, y = value, color = data_version)) +
     y = "SARI incidence",
     color = "Data as of"
   ) +
-  # scale_x_date(
-  #   breaks = as.Date(c("2023-08-01", "2023-12-01"))
-  # ) +
-  #scale_y_continuous(limits = c(0, NA)) +
   scale_color_manual(
     values = version_colors,
     limits = names(version_colors)
@@ -180,271 +217,78 @@ plot <- ggplot(df_all, aes(x = date, y = value, color = data_version)) +
 
 plot
 
+##########################################
+### Revisions for all indicators - FIGURE 2
 
-### Revisions all - FIGURE 2
+# vector of dates for which to show revisions:
+dates <- format(seq(as.Date("2023-11-22"), as.Date("2025-04-24"), by = "1 week"), "%Y-%m-%d")
+# remove Christmas:
+# dates <- dates[!dates %in% c("2023-12-27", "2024-01-03", "2024-12-25", "2025-01-01")]
 
-dates <- format(seq(as.Date("2023-01-01"), as.Date("2024-04-28"), by = "4 weeks"), "%Y-%m-%d")
+# the three data sources to show:
+data_sources <- c("sari", "are", "influenza")
+# axis labels
+ylabs <- c("sari" = "SARI incidence",
+           "are" = "ARI incidence",
+           "rsv" = "SurvStat RSV incidence",
+           "influenza" = "SurvStat influenza incidence")
 
-df_all <- map_dfr(dates, function(d) {
-  cat(d, "\n")
-  
-  df_temp <- load_combined_series('sari', as_of=d, drop_incomplete = FALSE) %>%  # CHANGE INDICATOR HERE SARI/ARE/RSV/INFLUENZA
-    # select("date", "icosari-sari-DE") %>%
-    filter(date >= as.Date("2022-11-06"),
-           age_group == "DE") %>%
-    mutate(data_version = d)
-  
-  return(df_temp)
-})
-
-df_all <- df_all %>%
-  mutate(data_version = as.character(data_version))
-
-last_version <- max(df_all$data_version)
-
-df_all <- df_all %>%
-  mutate(
-    color_group = ifelse(data_version == last_version, "Final data", "Initial report")
-  )
-
-
-plot <- ggplot(df_all, aes(x = date, y = value, group = data_version, color = color_group)) +
-  geom_line() +
-  scale_x_date(
-    expand = c(0, 0),
-    limits = as.Date(c("2022-11-06", "2024-04-21")),
-    minor_breaks = seq(as.Date("2022-11-06"), as.Date("2024-04-28"), by = "4 weeks"),
-    breaks = seq(as.Date("2022-11-06"), as.Date("2024-04-28"), by = "12 weeks")[-1],
-    date_labels = "%Y-%m-%d"
-  ) +
-  scale_y_continuous(limits = c(0, NA)) +
-  labs(
-    x = NULL,
-    y = "SARI incidence",
-    color = NULL  # Legend title
-  ) +
-  scale_color_manual(
-    values = c("Initial report" = "deepskyblue3", "Final data" = "black") # "springgreen4"
-  ) +
-  theme_bw() +
-  theme(
-    legend.position = c(0.98, 0.98),
-    legend.justification = c("right", "top"),
-    legend.background = element_rect(fill = alpha("white", 0.8)),
-    legend.key = element_blank()
-  )
-
-plot
-
-ggsave("figures/revisions.pdf", width = 190.5, height = 110, unit = "mm", device = "pdf")
-
-
-
-
-
-
-
-
-
-
-### Multiple indicators - DOES NOT WORK COMPLETELY
-
-
-indicators <- c("sari", "are", "influenza", "rsv")
-dates <- c("2024-09-03", "2024-10-01", "2024-11-05", "2024-12-03", "2025-01-07")
-
-base_colors <- c(
-  "#1f77b4",  # Blue
-  "#ff7f0e",  # Orange
-  "#2ca02c",  # Green
-  "#d62728",  # Red
-  "#000000"   # Black
-)
-
-version_colors <- setNames(base_colors, dates)
-
-# Load all indicators across all data versions into a single tidy df
-df_all <- cross_df(list(indicator = indicators, date_version = dates)) %>%
-  pmap_dfr(function(indicator, date_version) {
-    target <- paste0(SOURCE_DICT[[indicator]], "-", indicator, "-DE")
+# create plot for each data source
+for(ds in data_sources){
+  cat("Starting ", ds, "...\n")
+  df_all <- map_dfr(dates, function(d) {
+    cat(d, "\n")
     
-    cat(indicator, date_version, "\n")
+    # load necessary data and organize a little
+    df_temp <- load_combined_series(ds, as_of=d, drop_incomplete = FALSE) %>%  # CHANGE INDICATOR HERE SARI/ARE/RSV/INFLUENZA
+      filter(date >= min(as.Date(dates)) - 35,
+             age_group == "DE") %>%
+      mutate(data_version = d)
     
-    load_combined_series(indicator, as_of = date_version, drop_incomplete = FALSE) %>%
-      select(date, value = all_of(target)) %>%
-      filter(date >= as.Date("2024-07-01")) %>%
-      mutate(
-        indicator = indicator,
-        data_version = as.character(date_version)
-      )
+    return(df_temp)
   })
-
-
-ggplot(df_all, aes(x = date, y = value, color = data_version)) +
-  geom_line(size = 1) +
-  facet_wrap(~ indicator, scales = "free_y", labeller = as_labeller(facet_labels)) +
-  labs(
-    x = NULL,
-    y = "Incidence",
-    color = "Data as of"
-  ) +
-  scale_color_manual(
-    values = version_colors,
-    limits = names(version_colors)
-  ) +
-  theme_bw() +
-  theme(
-    legend.position = "right",
-    legend.key = element_blank()
-  )
-
-ggsave("figures/revisions.pdf", width = 190.5, height = 110, unit = "mm", device = "pdf")
-
-
-
-
-
-are <- load_combined_series('are', as_of="2023-09-03", drop_incomplete = FALSE)
-
-load_target_series('are', as_of="2023-09-03")
-
-r1 <- load_rt('sari')
-r2 <- load_rt('are')
-target <- target_as_of(r2, date="2023-09-03")
-
-
-
-dates <- format(seq(as.Date("2023-09-17"), as.Date("2024-08-28"), by = "4 weeks"), "%Y-%m-%d")
-
-df_all <- map_dfr(dates, function(d) {
-  cat(d, "\n")
   
-  df_temp <- load_combined_series('sari', as_of=d, drop_incomplete = FALSE) %>%
-    # select("date", "icosari-sari-DE") %>%
-    filter(date >= as.Date("2022-11-06"),
-           age_group == "DE") %>%
-    mutate(data_version = d)
+  df_all <- df_all %>%
+    mutate(data_version = as.character(data_version))
   
-  return(df_temp)
-})
-
-df_all <- df_all %>%
-  mutate(data_version = as.character(data_version))
-
-last_version <- max(df_all$data_version)
-
-df_all <- df_all %>%
-  mutate(
-    color_group = ifelse(data_version == last_version, "Final data", "Initial report")
-  )
-
-
-plot <- ggplot(df_all, aes(x = date, y = value, group = data_version, color = color_group)) +
-  geom_line() +
-  scale_x_date(
-    expand = c(0, 0),
-    limits = as.Date(c("2023-09-15", "2024-08-21")),
-    minor_breaks = seq(as.Date("2022-11-06"), as.Date("2024-08-28"), by = "4 weeks"),
-    breaks = seq(as.Date("2022-11-06"), as.Date("2024-08-28"), by = "8 weeks")[-1],
-    date_labels = "%Y-%m-%d"
-  ) +
-  scale_y_continuous(limits = c(400000, 2200000)) +
-  labs(
-    x = NULL,
-    y = "ARI",
-    color = NULL  # Legend title
-  ) +
-  scale_color_manual(
-    values = c("Initial report" = "deepskyblue3", "Final data" = "black") # "springgreen4"
-  ) +
-  theme_bw() +
-  theme(
-    legend.position = c(0.98, 0.98),
-    legend.justification = c("right", "top"),
-    legend.background = element_rect(fill = alpha("white", 0.8)),
-    legend.key = element_blank()
-  )
-
-plot
-
-ggsave("figures/revisions_are.png", width = 190.5, height = 110, unit = "mm", device = "png")
-
-
-#### Individual frames
-
-# Stelle sicher, dass data_version als Date vorliegt
-df_all <- df_all %>%
-  mutate(data_version = as.Date(data_version))
-
-# Alle As-of-Daten sortiert
-versions <- sort(unique(df_all$data_version))
-
-# Ausgabe-Ordner
-out_dir <- "figures/revisions_sari_frames"
-dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
-
-# Fixe Skalen (an deine bisherigen Limits angepasst)
-x_limits <- as.Date(c("2023-09-15", "2024-08-21"))
-x_minor  <- seq(as.Date("2022-11-06"), as.Date("2024-08-28"), by = "4 weeks")
-x_major  <- seq(as.Date("2022-11-06"), as.Date("2024-08-28"), by = "8 weeks")[-1]
-#y_limits <- c(400000, 2200000)
-y_limits <- c(NA, NA)
-
-# Schleife über Frames
-walk(seq_along(versions), function(i) {
-  current_ver <- versions[i]
+  last_version <- max(df_all$data_version)
   
-  # Alle Versionen bis einschließlich current_ver
-  df_until_now <- df_all %>%
-    filter(data_version <= current_ver)
+  df_all <- df_all %>%
+    mutate(
+      color_group = ifelse(data_version == last_version, "Final data", "Initial report")
+    )
   
-  # Aufteilen: ältere (blau) vs. aktuelle (schwarz)
-  df_blue <- df_until_now %>% filter(data_version <  current_ver)
-  df_black <- df_until_now %>% filter(data_version == current_ver)
-  
-  p <- ggplot() +
-    # zuerst alle bisherigen (blau), damit die aktuelle (schwarz) oben liegt
-    geom_line(
-      data = df_blue,
-      aes(x = date, y = value, group = data_version, color = "Initial report"),
-      linewidth = 0.5, alpha = 0.9
-    ) +
-    geom_line(
-      data = df_black,
-      aes(x = date, y = value, group = data_version, color = "Final data"),
-      linewidth = 0.8
-    ) +
+  # build plot
+  plot <- ggplot(df_all, aes(x = date, y = value, group = data_version, color = color_group)) +
+    geom_line() +
     scale_x_date(
       expand = c(0, 0),
-      limits = x_limits,
-      minor_breaks = x_minor,
-      breaks = x_major,
+      limits = c(as.Date(dates[1]) - 21, as.Date(tail(dates, 1)) + 7),
+      minor_breaks = seq(as.Date(dates[1]) - 21, as.Date(tail(dates, 1)) + 7, by = "4 weeks"),
+      breaks = seq(as.Date(dates[1]) - 21, as.Date(tail(dates, 1)) + 7, by = "12 weeks"),
       date_labels = "%Y-%m-%d"
     ) +
-    scale_y_continuous(limits = y_limits) +
+    scale_y_continuous(limits = c(0, NA)) +
     labs(
       x = NULL,
-      y = "SARI",
-      color = NULL,
-      title = paste0("As of: ", format(current_ver, "%Y-%m-%d"))
+      y = ylabs[ds],
+      color = NULL  # Legend title
     ) +
     scale_color_manual(
-      values = c("Initial report" = "deepskyblue3", "Final data" = "black")
+      values = c("Initial report" = "#D55E00", "Final data" = "black") # "springgreen4"
     ) +
     theme_bw() +
     theme(
-      legend.position = c(0.98, 0.98),
+      legend.position = c(0.5, 0.98),
       legend.justification = c("right", "top"),
       legend.background = element_rect(fill = alpha("white", 0.8)),
-      legend.key = element_blank(),
-      plot.title = element_text(hjust = 1, face = "bold")
+      legend.key = element_blank()
     )
   
-  # Dateiname mit laufender Nummer und Datum
-  file_name <- file.path(
-    out_dir,
-    sprintf("revisions_sari_%02d.png", i)
-  )
+  plot
   
-  ggsave(file_name, plot = p, width = 190.5, height = 110, units = "mm", dpi = 300)
-})
+  # store:
+  file_name <- paste0("figures/revisions_", ds, ".pdf")
+  ggsave(file_name, width = 140, height = 110, unit = "mm", device = "pdf")
+  
+}

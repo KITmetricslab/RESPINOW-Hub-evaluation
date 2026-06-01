@@ -1,3 +1,5 @@
+# This file sets up dictionaries for relevant dates, models, colours etc.
+
 SOURCE_DICT <- c(
   sari = "icosari",
   are = "agi",
@@ -33,9 +35,9 @@ FORECAST_DATES = c(
 )
 
 LEVEL_LABELS <- c(
-  "national" = "National level",
+  "national" = "Total",
   "states" = "State level",
-  "age" = "Age groups"
+  "age" = "By age group"
 )
 
 NOWCAST_MODELS <- c("KIT-simple_nowcast", "KIT-epinowcast", "RIVM-GAM", "RKI-Pilot_01",
@@ -63,7 +65,9 @@ MODEL_ORDER <- c(
   "MPIDS-PS_embedding",
   "HZI-ODEmodel",
   "baseline",
-  "KIT-persistence"
+  "KIT-persistence",
+  "KIT-hhh4_christmas",
+  "respicast-ensemble"
 )
 
 MODEL_COLORS <- c(
@@ -91,7 +95,8 @@ MODEL_COLORS <- c(
   
   # Baseline
   "baseline"               = "#000000",
-  "KIT-persistence"        = "#382e11"
+  "KIT-persistence"        = "#382e11",
+  "respicast-ensemble"     = "black"
 )
 
 MODEL_LABELS <- c(
@@ -109,6 +114,7 @@ MODEL_LABELS <- c(
   "KIT-LightGBM"                 = "LightGBM",
   "KIT-TSMixer"                  = "TSMixer",
   "KIT-hhh4"                     = "hhh4",
+  "KIT-hhh4_christmas"           = "hhh4_christmas",
   "MPIDS-PS_embedding"           = "PS-Embedding",
   "RIVM-GAM"                     = "RIVM-GAM",
   "RKI-Pilot_01"                 = "RKI-Pilot",
@@ -116,7 +122,8 @@ MODEL_LABELS <- c(
   
   # Baselines
   "baseline"                     = "Historical",
-  "KIT-persistence"              = "Persistence"
+  "KIT-persistence"              = "Persistence",
+  "respicast-ensemble"           = "Respicast"
 )
 
 
@@ -142,11 +149,19 @@ MODELS_FORECAST <- list(
     'KIT-LightGBM',
     'KIT-TSMixer',
     'MPIDS-PS_embedding',
-    'KIT-MeanEnsemble',
-    'KIT-Ensemble',
+    "KIT-EnsembleRealtime",
+    'KIT-EnsembleComplete',
+    'KIT-persistence',
     'baseline'
   ),
-  are = c('KIT-hhh4', 'KIT-LightGBM', 'KIT-TSMixer', 'MPIDS-PS_embedding'),
+  are = c('KIT-hhh4',
+          'KIT-LightGBM',
+          'KIT-TSMixer',
+          'MPIDS-PS_embedding',
+          'KIT-EnsembleComplete',
+          'KIT-persistence',
+          'baseline',
+          'respicast-ensemble'),
   influenza = c('HZI-ODEmodel'),
   rsv = c('HZI-ODEmodel')
 )

@@ -1,10 +1,14 @@
+# This file plots coverage fractions
+
 library(tidyverse)
 library(ggh4x) # for facet_nested, used to separate nowcasts and forecasts
 library(patchwork) # to combine plots, align them nicely and combine legends/axis titles
 
+# get configuration and utility functions:
 source("code/config.R")
 source("code/data_utils.R")
 
+# plot theme:
 custom_theme <- theme(
   plot.title = element_text(size = 11),
   strip.text = element_text(size = 10),
@@ -21,7 +25,7 @@ custom_theme <- theme(
   panel.border = element_rect(linewidth = 0.2)
 )
 
-
+# plotting function:
 plot_coverage_by_level <- function(df_wide, models = NULL) {
   if (!is.null(models)) {
     df_wide <- df_wide %>% filter(model %in% models)
@@ -47,7 +51,7 @@ plot_coverage_by_level <- function(df_wide, models = NULL) {
         kind  = function(x) rep("", length(x))
       ),
       strip = strip_nested(
-        background_x = c(element_blank(), element_rect()),
+        background_x = list(element_blank(), element_rect()),
         by_layer_x = TRUE
       ),
       drop = TRUE
@@ -69,7 +73,8 @@ plot_coverage_by_level <- function(df_wide, models = NULL) {
   p
 }
 
-plot_coverage <- function(disease, export = TRUE) {
+# wrapper function handling data loading and storing plot:
+plot_coverage <- function(disease, export = TRUE, title = "", add_age = TRUE) {
   
   df <- load_scores(diseases = disease, by_horizon = FALSE) %>%
     mutate(
@@ -87,11 +92,55 @@ plot_coverage <- function(disease, export = TRUE) {
     filter(level == "age") %>%
     plot_coverage_by_level()
   
-  p <- p_nat + p_age + patchwork::plot_layout(guides = "collect")
+  p <- p_nat + ggtitle(title)
+  if(add_age){
+    p <- p + p_age + patchwork::plot_layout(guides = "collect") 
+  }
   
   if (export) {
     ggsave(
-      paste0("figures/coverage_", disease, ".pdf"),
+      paste0("figures/coverage_", disease, if(add_age) "_age", ".pdf"),
+      plot = p,
+      width = ifelse(add_age, 190.5, 120),
+      height = 110,
+      units = "mm"
+    )
+  }
+  
+  p
+}
+
+# apply to SARI and ARI:
+plot_coverage("sari", title = "SARI")
+plot_coverage("are", title = "ARI")
+
+# plotting function by horizon (not stored):
+plot_coverage_by_horizon <- function(disease, export = TRUE, title = "") {
+  
+  df <- load_scores(diseases = disease, by_horizon = TRUE) %>%
+    mutate(
+      kind = factor(
+        ifelse(model %in% NOWCAST_MODELS, "Nowcast", "Forecast"),
+        levels = c("Nowcast", "Forecast")
+      )
+    )
+  
+  p_nat <- df %>%
+    filter(level == "national") %>%
+    plot_coverage_by_level() +
+    facet_grid(
+      level ~ horizon,
+      scales = "free",
+      space = "free_x",
+      labeller = labeller(level = LEVEL_LABELS)
+    )
+  
+  p <- p_nat +
+    ggtitle(title)
+  
+  if (export) {
+    ggsave(
+      paste0("figures/coverage_horizon_", disease, ".pdf"),
       plot = p,
       width = 190.5,
       height = 110,
@@ -102,8 +151,5 @@ plot_coverage <- function(disease, export = TRUE) {
   p
 }
 
-plot_coverage("sari")
-plot_coverage("are")
-plot_coverage("influenza")
-plot_coverage("rsv")
-
+plot_coverage_by_horizon("sari", title = "SARI")
+plot_coverage_by_horizon("are", title = "ARI")

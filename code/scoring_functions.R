@@ -1,3 +1,5 @@
+# Functions for compute_scores.csv
+
 # Quantile score
 qs <- function(q, y, alpha) {
   2 * (as.numeric(y < q) - alpha) * (q - y)
@@ -15,19 +17,8 @@ score <- function(prediction, observation, type, quantile) {
   }
 }
 
-
-# Compute scores for each row in a dataframe
-# compute_scores <- function(df) {
-#   df <- df %>%
-#     rowwise() %>%
-#     mutate(score = score(value, truth, type, quantile),
-#            score = round(score, digits = 5)) %>% 
-#     select(-c(pathogen, value, truth))
-# }
-
-
 # Compute WIS decomposition
-compute_wis <- function(df) {
+compute_wis <- function(df, detailed = FALSE) {
   df_median <- df %>%
     filter(type == "quantile", quantile == 0.5) %>%
     rename(med = value) %>%
@@ -46,8 +37,25 @@ compute_wis <- function(df) {
       wis = score(value, target, type, quantile),
       spread = score(value, med, type, quantile),
       overprediction = ifelse(med > target, wis - spread, 0),
-      underprediction = ifelse(med < target, wis - spread, 0)
+      underprediction = ifelse(med < target, wis - spread, 0),
+      ae = abs(med - target),
+      n = 1
     )
+  
+  if(detailed){
+    df <- df %>% 
+      group_by(source, disease, level, location, age_group, horizon, model, forecast_date) %>%
+      summarize(
+        spread = mean(spread),
+        overprediction = mean(overprediction),
+        underprediction = mean(underprediction),
+        wis = mean(wis),
+        ae = mean(ae),
+        n = sum(n),
+        .groups = "drop"
+      )
+    return(df)
+  }
   
   df <- df %>%
     group_by(source, disease, level, location, age_group, horizon, model) %>%
@@ -56,12 +64,15 @@ compute_wis <- function(df) {
       overprediction = mean(overprediction),
       underprediction = mean(underprediction),
       wis = mean(wis),
+      ae = mean(ae),
+      n = sum(n),
       .groups = "drop"
     )
   
   return(df)
 }
 
+# compute coverage:
 compute_coverage <- function(df) {
   df_wide <- df %>%
     filter(type == "quantile") %>%
@@ -76,7 +87,7 @@ compute_coverage <- function(df) {
   df_wide <- df_wide %>%
     mutate(
       c50 = target >= quantile_0.25 & target <= quantile_0.75,
-      c95 = target >= quantile_0.025 & target <= quantile_0.975
+      c95 = target >= quantile_0.025 & target <= quantile_0.975,
     )
   
   coverage_df <- df_wide %>%

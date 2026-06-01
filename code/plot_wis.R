@@ -1,7 +1,10 @@
+# This file generates summary plots for WIS scores.
+
 library(tidyverse)
 library(ggh4x) # for facet_nested, used to separate nowcasts and forecasts
 library(patchwork) # to combine plots, align them nicely and combine legends/axis titles
 
+# get utility functions
 source("code/config.R")
 source("code/data_utils.R")
 
@@ -21,8 +24,14 @@ custom_theme <- theme(
   panel.border = element_rect(linewidth = 0.2)
 )
 
+labels_ind <- c("are" = "ARI",
+                "sari" = "SARI")
 
-plot_wis_by_level <- function(df_long, models = NULL) {
+
+# custom plotting functions. Note: these automatically write out plots to PDFs.
+
+# summary plot for a given level (national level or age groups):
+plot_wis_by_level <- function(df_long, models = NULL, label = "") {
   if (!is.null(models)) {
     df_long <- df_long %>% filter(model %in% models)
   }
@@ -34,15 +43,18 @@ plot_wis_by_level <- function(df_long, models = NULL) {
   
   # Relabel level for facets
   level_labels <- c(
-    "national" = "National level",
-    "states" = "State level",
-    "age" = "Age groups"
+    "national" = paste(label, "- total"),
+    "states" = paste(label, "- by state"),
+    "age" = paste(label, "- age-stratified")
   )
   
   # Separate WIS and its components for plotting
   df_wis <- df_long %>% filter(metric == "wis")
-  df_components <- df_long %>% filter(metric != "wis")
+  df_ae <- df_long %>% filter(metric == "ae")
+  df_ae$metric_point <- "ae"
+  df_components <- df_long %>% filter(metric %in% c("underprediction", "spread", "overprediction"))
   
+  # plot:
   p <- ggplot() +
     geom_bar(
       data = df_wis,
@@ -61,6 +73,10 @@ plot_wis_by_level <- function(df_long, models = NULL) {
       linewidth = 0.2,
       show.legend = TRUE
     ) +
+    geom_point(
+      data = df_ae,
+      aes(x = model, y = value, colour = model, shape = metric_point)
+    ) +
     facet_nested(
       ~kind + level,
       scales = "free",
@@ -71,7 +87,7 @@ plot_wis_by_level <- function(df_long, models = NULL) {
       ),
       #independent="y",
       strip = strip_nested(
-        background_x = c(element_blank(),
+        background_x = list(element_blank(),
                          element_rect()),
         by_layer_x=TRUE),
       drop=TRUE,
@@ -80,6 +96,9 @@ plot_wis_by_level <- function(df_long, models = NULL) {
     scale_fill_manual(values = MODEL_COLORS, guide = "none") +
     scale_x_discrete(labels = MODEL_LABELS) +
     #scale_x_discrete(drop = TRUE) +
+    scale_shape(
+      labels = c("ae" = "Absolute error"), 
+    ) +
     scale_alpha_discrete(
       labels = c(
         "overprediction" = "Overprediction",
@@ -93,7 +112,8 @@ plot_wis_by_level <- function(df_long, models = NULL) {
       y = "WIS",
       color = "Model",
       alpha = "Decomposition of WIS:",
-      title = NULL
+      title = NULL,
+      shape = NULL
     ) +
     theme_bw() +
     custom_theme + # Assumes you’ve defined this elsewhere
@@ -104,9 +124,14 @@ plot_wis_by_level <- function(df_long, models = NULL) {
   return(p)
 }
 
-
-plot_wis <- function(disease, export = TRUE) {
+# wrapper around plot_wis_by_level which loads stuf and saves output:
+plot_wis <- function(disease, export = TRUE, models = NULL) {
   
+  if(is.null(models)){
+    models <- c(MODELS_NOWCAST[[disease]], MODELS_FORECAST[[disease]])
+  }
+  
+  # get scores:
   df <- load_scores(diseases = disease, by_horizon = FALSE) %>%
     mutate(
       kind = factor(
@@ -115,21 +140,23 @@ plot_wis <- function(disease, export = TRUE) {
       )
     ) %>%
     pivot_longer(
-      c(wis, underprediction, spread, overprediction),
+      c(wis, underprediction, spread, overprediction, ae),
       names_to = "metric",
       values_to = "value"
     )
-  
+  # restrict to models:
+  df <- filter(df, model %in% models)
+  # national:
   p_nat <- df %>%
     filter(level == "national") %>%
-    plot_wis_by_level()
-  
+    plot_wis_by_level(label = labels_ind[disease])
+  # age groups:
   p_age <- df %>%
     filter(level == "age") %>%
-    plot_wis_by_level()
-  
+    plot_wis_by_level(label = labels_ind[disease])
+  # stitch together:
   p <- p_nat + p_age + patchwork::plot_layout(guides = "collect")
-  
+  # export:
   if (export) {
     ggsave(
       paste0("figures/wis_", disease, ".pdf"),
@@ -143,17 +170,22 @@ plot_wis <- function(disease, export = TRUE) {
   p
 }
 
-
+# apply to each target:
 plot_wis("are")
 plot_wis("sari")
 plot_wis("rsv")
 plot_wis("influenza")
 
+# # get scores:
+# scores <- read.csv("data/scores.csv")
+# scores <- subset(scores, disease == "are" & age_group == "00+" & location == "DE" &
+#                    model %in% c("KIT-EnsembleComplete", "respicast-ensemble"))
 
 
 ### WIS by horizon
 
-plot_wis_by_horizon <- function(df_scores_long){
+# plotting function:
+plot_wis_by_horizon <- function(df_scores_long, add_ae = FALSE){
   
   model_order <- MODEL_ORDER[MODEL_ORDER %in% unique(df_scores_long$model)]
   df_scores_long <- df_scores_long %>%
@@ -161,7 +193,8 @@ plot_wis_by_horizon <- function(df_scores_long){
   
   # Separate data for WIS and components
   scores_wis <- df_scores_long %>% filter(metric == "wis")
-  scores_components <- df_scores_long %>% filter(metric != "wis")
+  scores_ae <- df_scores_long %>% filter(metric == "ae")
+  scores_components <- df_scores_long %>% filter(metric %in% c("underprediction", "spread", "overprediction"))
   
   
   p <- ggplot() +
@@ -213,24 +246,38 @@ plot_wis_by_horizon <- function(df_scores_long){
       strip.text = element_text(size = 9)
     )
   
+  if(add_ae){
+    p <- p +
+      geom_point(
+      data = scores_ae,
+      aes(x = model, y = value),
+    )
+  }
+  
   return(p)
 }
 
-plot_wis_by_horizon_disease <- function(disease, export = TRUE) {
+# wrapper around plot_wis_by_horizon which loads stuff and saves output:
+plot_wis_by_horizon_disease <- function(disease, export = TRUE, add_ae = FALSE, models = NULL, label = "") {
+  
+  if(is.null(models)){
+    models <- c(MODELS_NOWCAST[[disease]], MODELS_FORECAST[[disease]])
+  }
   
   df_scores_long <- load_scores(diseases = disease, by_horizon = TRUE) %>%
     filter(level != "states") %>% 
     pivot_longer(
-      cols = c(wis, underprediction, spread, overprediction),
+      cols = c(wis, underprediction, spread, overprediction, ae),
       names_to = "metric",
       values_to = "value"
     )
   
-  p <- plot_wis_by_horizon(df_scores_long)
+  df_scores_long <- df_scores_long %>% filter(model %in% models)
+  p <- plot_wis_by_horizon(df_scores_long, add_ae = add_ae)
   
   if (export) {
     ggsave(
-      paste0("figures/wis_by_horizon_", disease, ".pdf"),
+      paste0("figures/wis_by_horizon_", disease, "label", ".pdf"),
       plot = p,
       width = 190.5,
       height = 110,
@@ -241,17 +288,25 @@ plot_wis_by_horizon_disease <- function(disease, export = TRUE) {
   p
 }
 
+# apply to four indicators:
 plot_wis_by_horizon_disease("sari")
 plot_wis_by_horizon_disease("are")
 plot_wis_by_horizon_disease("influenza")
 plot_wis_by_horizon_disease("rsv")
 
+# special plot comparing hhh4 and hhh4-christmas
+plot_wis_by_horizon_disease("are", models = c("KIT-hhh4", "KIT-hhh4_christmas"), label = "christmas")
 
 
 
-### By age group
+### By age group (not exported)
 
-plot_wis_by_age <- function(disease, export = TRUE) {
+# plotting function:
+plot_wis_by_age <- function(disease, export = TRUE, models = NULL) {
+  
+  if(is.null(models)){
+    models <- c(MODELS_NOWCAST[[disease]], MODELS_FORECAST[[disease]])
+  }
   
   df_long <- load_scores(diseases = disease, by_age = TRUE) %>%
     filter(age_group != "00+") %>%
@@ -266,6 +321,8 @@ plot_wis_by_age <- function(disease, export = TRUE) {
       names_to = "metric",
       values_to = "value"
     )
+  
+  df_long <- filter(df_long, model %in% models)
   
   model_order <- MODEL_ORDER[MODEL_ORDER %in% unique(df_long$model)]
   df_long <- df_long %>%
@@ -308,7 +365,7 @@ plot_wis_by_age <- function(disease, export = TRUE) {
           kind = function(x) rep("", length(x))  # hide inner strip text
         ),
         strip = strip_nested(
-          background_x = c(element_blank(), element_rect()),
+          background_x = list(element_blank(), element_rect()),
           by_layer_x = TRUE
         ),
         drop = TRUE
