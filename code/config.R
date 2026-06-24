@@ -96,7 +96,7 @@ MODEL_COLORS <- c(
   # Baseline
   "baseline"               = "#000000",
   "KIT-persistence"        = "#382e11",
-  "respicast-ensemble"     = "black"
+  "respicast-ensemble"     = "#6A3D9A"
 )
 
 MODEL_LABELS <- c(

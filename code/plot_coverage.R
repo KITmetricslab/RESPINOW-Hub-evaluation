@@ -74,7 +74,7 @@ plot_coverage_by_level <- function(df_wide, models = NULL) {
 }
 
 # wrapper function handling data loading and storing plot:
-plot_coverage <- function(disease, export = TRUE, title = "", add_age = TRUE) {
+plot_coverage <- function(disease, export = TRUE, title = "", add_age = FALSE) {
   
   df <- load_scores(diseases = disease, by_horizon = FALSE) %>%
     mutate(

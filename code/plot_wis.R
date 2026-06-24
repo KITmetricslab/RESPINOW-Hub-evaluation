@@ -277,7 +277,7 @@ plot_wis_by_horizon_disease <- function(disease, export = TRUE, add_ae = FALSE, 
   
   if (export) {
     ggsave(
-      paste0("figures/wis_by_horizon_", disease, "label", ".pdf"),
+      paste0("figures/wis_by_horizon_", disease, label, ".pdf"),
       plot = p,
       width = 190.5,
       height = 110,
