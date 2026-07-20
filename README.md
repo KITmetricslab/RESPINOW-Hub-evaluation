@@ -34,3 +34,6 @@ The code files use global settings and functions defined in the following R file
    - `scoring_functions.R` implements WIS decomposition and coverage
    - `config.R` defines some dictionaries, model categories and colours for plotting
    - `data_utils` contains functions to load data (time series and forecasts)
+   
+The forecasts from the model `respicast-ensemble` were taken from the repository [european-modelling-hubs/RespiCast-SyndromicIndicators](https://github.com/european-modelling-hubs/RespiCast-SyndromicIndicators/tree/main/model-output/respicast-hubEnsemble),
+where they are available udner a CC-BY-4.0 license.
