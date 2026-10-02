@@ -17,8 +17,21 @@ score <- function(prediction, observation, type, quantile) {
   }
 }
 
-# Compute WIS decomposition
-compute_wis <- function(df, detailed = FALSE) {
+# Compute WIS decomposition for each forecast / observation pair
+compute_wis <- function(df, detailed = FALSE, log = FALSE, baseline = "KIT-persistence") {
+  
+  # subset to national and age groups:
+  df <- subset(df, level %in% c("national", "age") & 
+                 disease %in% c("are", "sari") &
+                 type %in% c("median", "quantile") &
+                 quantile %in% QUANTILES)
+  
+  # transform if log desired:
+  if(log){
+    df$value <- log(pmax(df$value, 0) + 1) # need to catch occasional negative quantiles
+    df$target <- log(df$target + 1)
+  }
+  
   df_median <- df %>%
     filter(type == "quantile", quantile == 0.5) %>%
     rename(med = value) %>%
@@ -42,38 +55,41 @@ compute_wis <- function(df, detailed = FALSE) {
       n = 1
     )
   
-  if(detailed){
+  # aggregate across quantiles:
     df <- df %>% 
-      group_by(source, disease, level, location, age_group, horizon, model, forecast_date) %>%
+      group_by(source, disease, level, location, age_group, horizon, model, forecast_date)
+    
+    # compute means:
+    df_means <- df %>%
       summarize(
         spread = mean(spread),
         overprediction = mean(overprediction),
         underprediction = mean(underprediction),
         wis = mean(wis),
+        # pval_wis = pval(wis),
         ae = mean(ae),
         n = sum(n),
         .groups = "drop"
-      )
-    return(df)
+      ) 
+    
+  # adapt colnames if log-transformed:
+  if(log){
+    inds <- colnames(df_means) %in% c("spread", "overprediction", "underprediction", "wis", "ae")
+    colnames(df_means)[inds] <- paste0(colnames(df_means)[inds], "_log")
   }
   
-  df <- df %>%
-    group_by(source, disease, level, location, age_group, horizon, model) %>%
-    summarize(
-      spread = mean(spread),
-      overprediction = mean(overprediction),
-      underprediction = mean(underprediction),
-      wis = mean(wis),
-      ae = mean(ae),
-      n = sum(n),
-      .groups = "drop"
-    )
-  
-  return(df)
+  return(df_means)
 }
 
-# compute coverage:
+# compute coverage for each combination of model and target / horizon:
 compute_coverage <- function(df) {
+  
+  # subset to national and age groups:
+  df <- subset(df, level %in% c("national", "age") & 
+                 disease %in% c("are", "sari") &
+                 type %in% c("median", "quantile") &
+                 quantile %in% c(0.025, 0.1, 0.25, 0.5, 0.75, 0.9, 0.975))
+  
   df_wide <- df %>%
     filter(type == "quantile") %>%
     pivot_wider(
