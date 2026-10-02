@@ -76,13 +76,17 @@ plot_coverage_by_level <- function(df_wide, models = NULL) {
 # wrapper function handling data loading and storing plot:
 plot_coverage <- function(disease, export = TRUE, title = "", add_age = FALSE) {
   
-  df <- load_scores(diseases = disease, by_horizon = FALSE) %>%
+  models_to_include <- c(MODELS_FORECAST[[disease]],
+                         MODELS_NOWCAST[[disease]])
+  df <- load_coverages(diseases = disease, by_horizon = FALSE,
+                    summarize = TRUE) %>%
     mutate(
       kind = factor(
         ifelse(model %in% NOWCAST_MODELS, "Nowcast", "Forecast"),
         levels = c("Nowcast", "Forecast")
       )
-    )
+    ) %>%
+    filter(model %in% models_to_include)
   
   p_nat <- df %>%
     filter(level == "national") %>%
@@ -111,19 +115,26 @@ plot_coverage <- function(disease, export = TRUE, title = "", add_age = FALSE) {
 }
 
 # apply to SARI and ARI:
-plot_coverage("sari", title = "SARI")
+plot_coverage("sari", title = "SARI", models = )
 plot_coverage("are", title = "ARI")
+
+plot_coverage("sari", title = "SARI", add_age = TRUE)
+plot_coverage("are", title = "ARI", add_age = TRUE)
 
 # plotting function by horizon (not stored):
 plot_coverage_by_horizon <- function(disease, export = TRUE, title = "") {
   
-  df <- load_scores(diseases = disease, by_horizon = TRUE) %>%
+  models_to_include <- c(MODELS_FORECAST[[disease]],
+                         MODELS_NOWCAST[[disease]])
+  
+  df <- load_coverages(diseases = disease, by_horizon = TRUE, summarize = TRUE) %>%
     mutate(
       kind = factor(
         ifelse(model %in% NOWCAST_MODELS, "Nowcast", "Forecast"),
         levels = c("Nowcast", "Forecast")
       )
-    )
+    ) %>%
+    filter(model %in% models_to_include)
   
   p_nat <- df %>%
     filter(level == "national") %>%
