@@ -5,14 +5,11 @@ source("code/data_utils.R")
 
 # FIGURE 1
 
-# load time series:
-# t1 <- load_combined_series('sari')
-# t2 <- load_combined_series('are')
-# t3 <- load_combined_series('influenza')
-# t4 <- load_combined_series('rsv')
-
 # names of indicators:
 indicators <- c("sari", "are", "influenza", "rsv")
+
+# christmas break period to highlight
+christmas_break <- as.Date(c("2024-12-24", "2025-01-08"))
 
 # load time series for all indicators:
 ts <- indicators %>%
@@ -165,7 +162,7 @@ ggplot() +
 
 
 ####################################################
-### PLot showing data revisions
+### Plot showing data revisions
 
 ### Overview plot in old style (not used in manuscript):
 
@@ -235,6 +232,8 @@ ylabs <- c("sari" = "SARI incidence",
 
 # create plot for each data source
 for(ds in data_sources){
+  
+  undebug(load_combined_series)
   cat("Starting ", ds, "...\n")
   df_all <- map_dfr(dates, function(d) {
     cat(d, "\n")
@@ -259,7 +258,17 @@ for(ds in data_sources){
     )
   
   # build plot
+  # determine ylims:
+  yl <- c(0, max(df_all$value))
   plot <- ggplot(df_all, aes(x = date, y = value, group = data_version, color = color_group)) +
+    annotate("rect", xmin = christmas_break[1], 
+             xmax = christmas_break[2],
+             ymin = yl[1], ymax = yl[2], colour = NA, 
+             fill = "lightgrey", alpha = 0.5) +
+    annotate("rect", xmin = christmas_break[1] - 7*53, 
+             xmax = christmas_break[2] - 7*53,
+             ymin = yl[1], ymax = yl[2], colour = NA, 
+             fill = "lightgrey", alpha = 0.5) +
     geom_line() +
     scale_x_date(
       expand = c(0, 0),
@@ -292,3 +301,4 @@ for(ds in data_sources){
   ggsave(file_name, width = 140, height = 110, unit = "mm", device = "pdf")
   
 }
+
