@@ -17,75 +17,31 @@ custom_theme <- theme(
   axis.text.y = element_text(size = 8)
 )
 # Manual alpha values for transparent plotting:
-alphas <- c("50%" = 0.7, "95%" = 0.4)
+alphas <- c("50%" = 0.7, "95%" = 0.3)
 
 # handle names of data sources
 indicators <- c("sari", "are")
 data_sources <- c("sari" = "icosari", "are" = "agi")
 
+# select which indicator to plot (change to "sari" for SARI plots)
+ind <- "sari"
+# switch this to create supplementary figures with different dates
+main <- TRUE
+
 # load submissions:
 submissions <- load_submissions(include_target = FALSE, include_median = FALSE)
 
-# select which indicator to plot (change to "sari" for SARI plots)
-ind <- "are"
+truth_final_ind <- read_csv(paste0("data/target-", 
+                                   data_sources[ind], "-", 
+                                   ind, ".csv"))
+truth_final_ind <- truth_final_ind %>% filter(location == "DE" & 
+                                                age_group == "00+" & 
+                                                date >= as.Date("2024-07-01") & 
+                                                date <= as.Date("2025-06-30"))
 
-######################################
-# Forecasts by age group and model (few selected dates)
+# christmas break period to highlight
+christmas_break <- as.Date(c("2024-12-24", "2025-01-08"))
 
-############
-# preparation
-
-# dates to display:
-dates_age <- c("2024-10-17", "2024-12-05", "2025-02-06", "2025-03-27", "2025-05-11")
-# select appropriate age groups for indicator: 
-age_groups <- unique(filter(submissions, disease == ind & age_group != "00+")$age_group)
-
-# age-group wise submissions in wide format
-submissions_wide_age <- submissions  %>%
-  filter(
-    type == "quantile",
-    quantile %in% QUANTILES,
-    forecast_date %in% as.Date(dates_age),
-    age_group %in% age_groups
-  ) %>%
-  pivot_wider(
-    names_from = quantile,
-    values_from = value,
-    names_prefix = "quantile_"
-  )
-
-# truth for age groups:
-truth_age <- cross_df(list(indicator = indicators, date_version = dates_age)) %>%
-  pmap_dfr(function(indicator, date_version) {
-    target <- paste0(SOURCE_DICT[[indicator]], "-", indicator, "-DE")
-    
-    cat(indicator, date_version, "\n")
-    
-    load_combined_series(indicator, as_of = date_version, drop_incomplete = FALSE, wide = FALSE) %>%
-      #select(date, value = all_of(target)) %>%
-      filter(date >= as.Date("2024-07-01")) %>%
-      mutate(
-        indicator = indicator,
-        data_version = as.character(date_version)
-      )
-  }) %>% 
-  mutate(age_group = str_replace(age_group, "DE", "00\\+"))
-
-# subset everything to selected indicator and age groups:
-truth_age_ind <- truth_age %>% 
-  filter(indicator == ind,
-         age_group %in% age_groups)
-
-submissions_age_ind <- submissions_wide_age %>% 
-  filter(disease == "sari")
-
-# subset to simple_nowcast and Ensemble (not plotting all models)
-nowcasts_age_ind <- submissions_age_ind %>% 
-  filter(model == "KIT-simple_nowcast") %>% 
-  select(-model)
-
-forecasts_age_ind <- submissions_age_ind %>% 
-  filter(model %in% c(MEMBERS_FORECAST[[ind]], "KIT-EnsembleComplete"))
 
 ######################################
 # Ensemble forecasts for age group 00+ (selected dates; FIG 4)
@@ -100,17 +56,56 @@ mapping_nowcasts <- c("KIT-EnsembleComplete" = "KIT-EnsembleNowcastComplete",
                       "MPIDS-PS_embedding" = NA
 )
 
+
+# a helper function to get wide format, to be applied per window
+# note: uses global variables inside, only for use in following line
+make_wide <- function(dates_vec, window_label) {
+  submissions %>%
+    filter(
+      location == "DE",
+      type == "quantile",
+      quantile %in% QUANTILES,
+      forecast_date %in% as.Date(dates_vec),
+      age_group == !!age_group,
+      disease %in% indicators
+    ) %>%
+    pivot_wider(
+      names_from   = quantile,
+      values_from  = value,
+      names_prefix = "quantile_"
+    ) %>%
+    transmute(
+      indicator = disease,   # align with truth facets
+      window    = window_label,
+      forecast_date,
+      target_end_date,
+      model,
+      across(starts_with("quantile_"), identity)
+    )
+}
+
 # run through forecasting models and generate plots:
-for(model_forecast in names(mapping_nowcasts)){
+models_to_plot <- c("KIT-EnsembleComplete")
+for(model_forecast in models_to_plot){
   
   model_nowcast <- mapping_nowcasts[model_forecast]
   age_group  <- "00+"
   
-  # date vectors per panel:
-  dates0 <- as.Date(c("2024-10-17", "2024-12-05", "2025-02-06", "2025-03-27", "2025-05-11"))
-  dates0 <- seq(from = as.Date("2024-10-17"), by = 7*7, length.out = 5)
-  dates1 <- dates0 + 14
-  dates2 <- dates0 + 42
+  if(main){
+    # date vectors per panel:
+    dates0 <- as.Date(c("2024-10-17", "2024-12-05", "2025-02-06", "2025-03-27", "2025-05-11"))
+    dates0 <- seq(from = as.Date("2024-10-17"), by = 7*7, length.out = 5)
+    dates1 <- dates0 + 14
+    dates2 <- dates0 + 42
+  }else{
+    # alternative dates for supplementary figure:
+    dates0 <- as.Date(c("2024-10-24", "2024-11-21", "2025-01-30", "2025-02-27"))
+    dates1 <- as.Date(c("2024-11-07", "2024-12-12", "2025-02-13", "2025-03-20"))
+    dates2 <- as.Date(c("2024-11-14", "2025-01-09", "2025-02-20"))
+  }
+
+  
+  # alternative dates for supplementar panel
   
   # labels for panels - empty as they don't have meaningful names
   window_labels <- c(
@@ -141,44 +136,7 @@ for(model_forecast in names(mapping_nowcasts)){
     mutate(age_group = str_replace(age_group, "DE", "00\\+")) %>%
     filter(indicator %in% indicators, age_group == !!age_group)
   
-  truth_final_ind <- read_csv(paste0("https://raw.githubusercontent.com/KITmetricslab/RESPINOW-Hub/refs/heads/main/data/",
-                                     data_sources[ind], "/",
-                                     ind, "/target-", data_sources[ind], "-", 
-                                     ind, 
-                                     ".csv"))
-  truth_final_ind <- truth_final_ind %>% filter(location == "DE" & 
-                                                  age_group == "00+" & 
-                                                  date >= as.Date("2024-07-01") & 
-                                                  date <= as.Date("2025-06-30"))
-  
   # submissions
-
-  # a helper function to get wide format, to be applied per window
-  # note: uses global variables inside, only for use in following line
-  make_wide <- function(dates_vec, window_label) {
-    submissions %>%
-      filter(
-        location == "DE",
-        type == "quantile",
-        quantile %in% QUANTILES,
-        forecast_date %in% as.Date(dates_vec),
-        age_group == !!age_group,
-        disease %in% indicators
-      ) %>%
-      pivot_wider(
-        names_from   = quantile,
-        values_from  = value,
-        names_prefix = "quantile_"
-      ) %>%
-      transmute(
-        indicator = disease,   # align with truth facets
-        window    = window_label,
-        forecast_date,
-        target_end_date,
-        model,
-        across(starts_with("quantile_"), identity)
-      )
-  }
   
   # collect relevant data across windows:
   pred_all <- bind_rows(
@@ -216,6 +174,10 @@ for(model_forecast in names(mapping_nowcasts)){
   forecast_ind <- forecast %>% filter(indicator == ind)
   
   # create plot:
+  # determine ylim:
+  yl <- c(0, 1.02*max(c(forecast_ind$quantile_0.975,
+                        truth_final_ind$value)))
+  
   p <- ggplot(truth_all_ind) +
     facet_grid(
       rows = vars(window),
@@ -223,6 +185,10 @@ for(model_forecast in names(mapping_nowcasts)){
       scales = "free_y",
       labeller = labeller(window = window_labels)
     ) +
+    annotate("rect", xmin = christmas_break[1], 
+             xmax = christmas_break[2],
+             ymin = yl[1], ymax = yl[2], colour = NA, 
+             fill = "lightgrey", alpha = 0.5) +
     # scale_y_continuous(limits = c(0, NA)) +
     geom_vline(
       data = vlines,
@@ -245,6 +211,11 @@ for(model_forecast in names(mapping_nowcasts)){
       data = forecast_ind,
       aes(x = target_end_date, y = quantile_0.5, group = forecast_date),
       color = "seagreen"
+    ) +
+    geom_point(
+      data = forecast_ind,
+      aes(x = target_end_date, y = quantile_0.5, group = forecast_date),
+      color = "seagreen", pch = 21, fill = "white", size = 0.6
     )
   
   # add nowcasts only if a nowcast model is specified for that forecast model:
@@ -288,12 +259,20 @@ for(model_forecast in names(mapping_nowcasts)){
       aes(x = date, y = value, group = data_version, color = "as of forecast date"),
       linewidth = 0.4
     ) +
-    
+    geom_point(
+      aes(x = date, y = value, group = data_version, color = "as of forecast date"),
+      pch = 16, size = 0.6
+    ) +
     # observed final (per window)
     geom_line(
       data = truth_final_ind,
       aes(x = date, y = value, color = "final"),
       linewidth = 0.4
+    ) +
+    geom_point(
+      data = truth_final_ind,
+      aes(x = date, y = value, color = "final"),
+      pch = 16, size = 0.6
     ) +
     
     scale_color_manual(
@@ -301,8 +280,8 @@ for(model_forecast in names(mapping_nowcasts)){
       values = c("as of forecast date" = "#D55E00", "final" = "black")
     ) +
     scale_fill_manual(
-      name = " ",
-      values = c(Forecast = "seagreen", Transition = "grey", Nowcast = "#009ACD"), # #179393
+      name = "Task",
+      values = c(Forecast = "seagreen", Nowcast = "#009ACD"), # #179393
       breaks = c("Nowcast", "Transition", "Forecast"),
       labels = c("Nowcast" = "Nowcast", "Transition" = "(Transition)", "Forecast" = "Forecast")
     ) +
@@ -310,21 +289,26 @@ for(model_forecast in names(mapping_nowcasts)){
       name = " ",
       values = c("Forecast date" = "dotted")
     ) +
-    scale_alpha_manual(values = alphas, guide = "none") +
+    scale_alpha_manual(values = alphas, 
+                       name = "Prediction intervals") +
     scale_y_continuous(labels = scales::comma, limits = c(0, NA)) +
     labs(x = NULL, y = ylabs[ind], linetype = NULL) +
     theme_bw() +
+    theme(strip.text.y = element_blank()) +
     custom_theme +
     theme(legend.position = "right",
           strip.background.x = element_blank(),
           strip.text.x = element_blank()) +
-    ggtitle(titles[ind])
+    ggtitle(titles[ind]) +
+    guides(linetype = guide_legend(order = 1),
+           col = guide_legend(order = 2),
+           alpha = guide_legend(order = 3))
   
   p
   
   # write out:
   ggsave(
-    paste0("figures/forecasts_", model_forecast, "_", ind,".pdf"),
+    paste0("figures/forecasts_", model_forecast, "_", ind, if(!main) "_suppl", ".pdf"),
     width = 140.5,
     height = 110,
     unit = "mm",
@@ -358,9 +342,7 @@ nowcasts_0wk <- pred_all %>% filter(model %in% MODELS_NOWCAST[[ind]] & difftime(
 frozen <- truth_all_ind %>% filter(difftime(date, as.Date(data_version)) >= -5)
 nrow(frozen)
 
-rt <- read_csv(paste0("https://raw.githubusercontent.com/KITmetricslab/RESPINOW-Hub/refs/heads/main/data/",
-                      data_sources[ind], "/",
-                      ind, "/reporting_triangle-", data_sources[ind], "-", 
+rt <- read_csv(paste0("data/reporting_triangle-", data_sources[ind], "-", 
                       ind, 
                       ".csv"))
 rt_ind <- rt %>% filter(location == "DE" & 
@@ -380,23 +362,21 @@ titles <- c("sari" = "SARI",
 
 nowcasts_0wk$before_christmas <- nowcasts_0wk$forecast_date <= as.Date("2024-12-24")
 
+# determine ylim:
+yl <- c(0, 1.05*max(c(nowcasts_0wk$quantile_0.975,
+                      truth_final_ind$value)))
+
 ggplot(truth_all_ind) +
   facet_wrap(facets = vars(model), labeller = labeller (model = MODEL_LABELS)) +
+  # highlight christmas break
+  annotate("rect", xmin = christmas_break[1], 
+           xmax = christmas_break[2],
+           ymin = yl[1], ymax = yl[2], colour = NA, 
+           fill = "lightgrey", alpha = 0.5) +
   geom_line(
     data = nowcasts_0wk,
     aes(x = target_end_date, y = quantile_0.5, color = "Nowcast", 
         colour = "Nowcast", group = before_christmas)
-  ) +
-  # observed final (per window)
-  geom_line(
-    data = truth_final_ind,
-    aes(x = date, y = value, color = "final"),
-    linewidth = 0.4
-  ) +
-  geom_line( # snapshots
-    data = rt_ind,
-    aes(x = date, y = value_0w, color = "as of nowcast date"),
-    linewidth = 0.4
   ) +
   geom_ribbon( # same-week nowcasts 95%
     data = nowcasts_0wk,
@@ -407,6 +387,27 @@ ggplot(truth_all_ind) +
     data = nowcasts_0wk,
     aes(x = target_end_date, ymin = quantile_0.25, ymax = quantile_0.75,
         alpha = "50%", fill = "Nowcast", group = before_christmas)
+  ) +
+  # observed final (per window)
+  geom_line(
+    data = truth_final_ind,
+    aes(x = date, y = value, color = "final"),
+    linewidth = 0.4
+  ) +
+  geom_point(
+    data = truth_final_ind,
+    aes(x = date, y = value, color = "final"),
+    size = 0.6
+  ) +
+  geom_line( # snapshots
+    data = rt_ind,
+    aes(x = date, y = value_0w, color = "as of nowcast date"),
+    linewidth = 0.4
+  ) +
+  geom_point( # snapshots
+    data = rt_ind,
+    aes(x = date, y = value_0w, color = "as of nowcast date"),
+    size = 0.6
   ) +
   scale_color_manual(
     name = "Data version",
@@ -428,7 +429,12 @@ ggplot(truth_all_ind) +
   theme(legend.position = "right",
         strip.background.x = element_blank()) +
   #        strip.text.x = element_blank()) +
-  ggtitle(titles[ind])
+  scale_alpha_manual(values = alphas, 
+                     name = "Prediction intervals") +
+  ggtitle(titles[ind])  +
+  guides(linetype = guide_legend(order = 1),
+         col = guide_legend(order = 2),
+         alpha = guide_legend(order = 3))
 
 # write out:
 ggsave(
@@ -456,6 +462,7 @@ pred_all <- bind_rows(
   make_wide(all_dates, "window")
 )
 
+
 # generate a data frame containing forecasts from all models plus the transition from
 # simple_nowcast where appropriate
 
@@ -473,19 +480,19 @@ for(model in forecast_models){
   # forecast <- bind_rows(forecast, nowcast)
   
   if(model %in% c("KIT-LightGBM", "KIT-TSMixer", "KIT-hhh4", "KIT-persistence")){
-    point_transition_mod <- bind_rows(filter(point_nowcast, difftime(forecast_date, target_end_date) == 4),
+    point_nowcasts_mod <- bind_rows(filter(point_nowcast, difftime(forecast_date, target_end_date) == c(4)),
                                       filter(point_forecasts_mod, difftime(forecast_date, target_end_date) == - 3))
-    point_transition_mod$model <- model
+    point_nowcasts_mod$model <- model
   }else{
-    point_transition_mod <- NULL
+    point_nowcasts_mod <- NULL
   }
   
   if(is.null(point_forecasts)){
     point_forecasts <- point_forecasts_mod
-    point_transition <- point_transition_mod
+    point_transition <- point_nowcasts_mod
   }else{
     point_forecasts <- bind_rows(point_forecasts, point_forecasts_mod)
-    point_transition <- bind_rows(point_transition, point_transition_mod)
+    point_transition <- bind_rows(point_transition, point_nowcasts_mod)
   }
 }
 
@@ -505,37 +512,57 @@ titles <- c("sari" = "SARI",
 
 # get relevant forecasts and transitions from snapshot data:
 point_forecasts_ind <- point_forecasts %>% filter(indicator == ind)
-point_transition_ind <- point_transition %>% filter(indicator == ind)
+point_nowcasts_ind <- point_transition %>% filter(indicator == ind)
 
 point_forecasts_ind$model <- factor(point_forecasts_ind$model,
                                     levels = MODEL_ORDER[MODEL_ORDER %in% unique(point_forecasts_ind$model)],
                                     ordered = TRUE)
-point_transition_ind$model <- factor(point_transition_ind$model,
-                                     levels = MODEL_ORDER[MODEL_ORDER %in% unique(point_transition_ind$model)],
+point_nowcasts_ind$model <- factor(point_nowcasts_ind$model,
+                                     levels = MODEL_ORDER[MODEL_ORDER %in% unique(point_nowcasts_ind$model)],
                                      ordered = TRUE)
 
 # plot:
+
+# determine ylim:
+yl <- c(0, 1.02*max(c(point_forecasts_ind$quantile_0.5,
+                      truth_final_ind$value)))
+
 ggplot(point_forecasts_ind) +
   facet_wrap(facets = vars(model), labeller = labeller (model = MODEL_LABELS)) +
+  annotate("rect", xmin = christmas_break[1], 
+           xmax = christmas_break[2],
+           ymin = yl[1], ymax = yl[2], colour = NA, 
+           fill = "lightgrey", alpha = 0.5) +
   geom_line(
     data = point_forecasts_ind,
     aes(x = target_end_date, y = quantile_0.5, group = forecast_date, color = "predictive median")
   ) +
-  geom_line(
-    data = point_transition_ind,
-    aes(x = target_end_date, y = quantile_0.5, group = forecast_date),
-    color = "lightgrey"
-  ) + 
+  geom_point(
+    data = point_forecasts_ind,
+    aes(x = target_end_date, y = quantile_0.5, group = forecast_date, 
+        color = "predictive median"), size = 0.6, shape = 21, fill = "white"
+  ) +
+  # geom_line(
+  #  data = point_nowcasts_ind,
+  #  aes(x = target_end_date, y = quantile_0.5,
+  #      group = forecast_date, color = "nowcast median")
+  # ) +
   # observed final (per window)
   geom_line(
     data = truth_final_ind,
     aes(x = date, y = value, color = "final data"),
     linewidth = 0.4
   ) +
-  
+  geom_point(
+    data = truth_final_ind,
+    aes(x = date, y = value, color = "final data"),
+    size = 0.6
+  ) +
   scale_color_manual(
     name = "",
-    values = c("predictive median" = "seagreen", "final" = "black")
+    values = c("predictive median" = "seagreen", 
+               # "nowcast median" = "#7cd9f7", 
+               "final data" = "black")
   ) +
   
   scale_linetype_manual(
