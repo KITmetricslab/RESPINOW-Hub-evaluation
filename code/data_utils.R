@@ -9,9 +9,9 @@ load_targets <- function() {
     map_dfr(~{
       disease <- .x
       source <- SOURCE_DICT[[disease]]
-      url <- str_glue("https://raw.githubusercontent.com/KITmetricslab/RESPINOW-Hub/main/data/{source}/{disease}/target-{source}-{disease}.csv")
+      path <- str_glue("data/target-{source}-{disease}.csv")
       
-      read_csv(url, show_col_types = FALSE) %>%
+      read_csv(path, show_col_types = FALSE) %>%
         rename(target = value) %>%
         mutate(source = source, disease = disease)
     })
@@ -55,11 +55,11 @@ load_submissions <- function(include_target = TRUE, include_median = TRUE) {
 load_latest_series <- function(indicator = "sari", wide=TRUE) {
   source <- SOURCE_DICT[[indicator]]
   
-  url <- glue::glue(
-    "https://raw.githubusercontent.com/KITmetricslab/RESPINOW-Hub/refs/heads/main/data/{source}/{indicator}/latest_data-{source}-{indicator}.csv"
+  path <- glue::glue(
+    "data/latest_data-{source}-{indicator}.csv"
   )
   
-  ts <- read_csv(url, show_col_types = FALSE) %>%
+  ts <- read_csv(path, show_col_types = FALSE) %>%
     filter(location == "DE") %>%
     mutate(date = as.Date(date),
            age_group = str_replace(age_group, "00\\+", "DE"))
@@ -104,11 +104,11 @@ load_rt <- function(indicator = "sari", preprocessed = FALSE) {
   source <- SOURCE_DICT[[indicator]]
   
   suffix <- if (preprocessed) "-preprocessed" else ""
-  url <- glue::glue(
-    "https://raw.githubusercontent.com/KITmetricslab/RESPINOW-Hub/refs/heads/main/data/{source}/{indicator}/reporting_triangle-{source}-{indicator}{suffix}.csv"
+  path <- glue::glue(
+    "data/reporting_triangle-{source}-{indicator}{suffix}.csv"
   )
   
-  rt <- read_csv(url, show_col_types = FALSE) %>%
+  rt <- read_csv(path, show_col_types = FALSE) %>%
     mutate(date = as.Date(date)) %>%
     select(1:which(names(.) == "value_4w"))
   
@@ -150,10 +150,10 @@ load_target_series <- function(indicator = "sari", as_of = NULL, age_group = NUL
   source <- SOURCE_DICT[[indicator]]
   
   if (is.null(as_of)) {
-    url <- glue::glue(
-      "https://raw.githubusercontent.com/KITmetricslab/RESPINOW-Hub/main/data/{source}/{indicator}/target-{source}-{indicator}.csv"
+    path <- glue::glue(
+      "data/target-{source}-{indicator}.csv"
     )
-    target <- read_csv(url, show_col_types = FALSE)
+    target <- read_csv(path, show_col_types = FALSE)
   } else {
     rt <- load_rt(indicator)
     target <- target_as_of(rt, as_of)
@@ -241,7 +241,8 @@ load_combined_series <- function(indicator = "sari", as_of = NULL, drop_incomple
 load_scores <- function(
     diseases = c("sari", "are"),
     by_age = FALSE,
-    by_horizon = FALSE
+    by_horizon = FALSE,
+    summarize = FALSE
 ) {
   df <- read_csv("data/scores.csv", show_col_types = FALSE) %>%
     mutate(
@@ -268,16 +269,73 @@ load_scores <- function(
     group_cols <- c(group_cols, "horizon")
   }
   
-  df_summary <- df %>%
-    group_by(across(all_of(group_cols))) %>%
-    summarise(
-      across(
-        c(spread, overprediction, underprediction, wis, c50, c95, ae),
-        mean,
-        na.rm = TRUE
-      ),
-      .groups = "drop"
+  if(summarize){
+    df <- df %>%
+      group_by(across(all_of(group_cols))) %>%
+      summarise(
+        across(
+          c(spread, overprediction, underprediction, wis,
+            spread_log, overprediction_log, underprediction_log, wis_log,
+            ae, ae_log),
+          mean,
+          na.rm = TRUE
+        ),
+        .groups = "drop"
+      )    
+  }
+  
+  return(df)
+}
+
+
+
+
+# load coverages:
+load_coverages <- function(
+    diseases = c("sari", "are"),
+    by_age = FALSE,
+    by_horizon = FALSE,
+    summarize = FALSE
+) {
+  df <- read_csv("data/coverage.csv", show_col_types = FALSE) %>%
+    mutate(
+      level = factor(
+        level,
+        levels = c("national", "age", "states"),
+        ordered = TRUE
+      )
     )
   
-  return(df_summary)
+  # Ensure diseases is a character vector
+  if (is.character(diseases) && length(diseases) == 1) {
+    diseases <- c(diseases)
+  }
+  
+  df <- df %>%
+    filter(disease %in% diseases)
+  
+  group_cols <- c("disease", "level", "model")
+  if (by_age) {
+    group_cols <- c(group_cols, "age_group")
+  }
+  if (by_horizon) {
+    group_cols <- c(group_cols, "horizon")
+  }
+  
+  if(summarize){
+    df <- df %>%
+      group_by(across(all_of(group_cols))) %>%
+      summarise(
+        across(
+          c(c50, c95),
+          mean,
+          na.rm = TRUE
+        ),
+        .groups = "drop"
+      )    
+  }
+  
+  return(df)
 }
+
+a <- load_coverages("are", summarize = TRUE)
