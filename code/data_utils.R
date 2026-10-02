@@ -135,9 +135,15 @@ target_as_of <- function(rt, date) {
     filter(date <= !!date) %>%
     group_by(location, age_group) %>%
     group_modify(~ set_last_n_values_to_na(.x)) %>%
-    ungroup() %>%
+    ungroup()
+  # handle delay -1 for survstat:
+  if(!"value_-1w" %in% colnames(rt_temp)){
+    rt_temp$`value_-1w` <- 0
+  }
+  
+  rt_temp <- rt_temp %>%
     mutate(
-      value = rowSums(select(., value_0w, value_1w, value_2w, value_3w, value_4w), na.rm = TRUE),
+      value = rowSums(select(., `value_-1w`, value_0w, value_1w, value_2w, value_3w, value_4w), na.rm = TRUE),
       value = as.integer(value)
     ) %>%
     select(location, age_group, year, week, date, value)
