@@ -1,7 +1,7 @@
 library(tidyverse)
 Sys.setlocale("LC_TIME", "C")
 
-df <- read_csv("https://raw.githubusercontent.com/KITmetricslab/RESPINOW-Hub/refs/heads/main/respinow_viz/plot_data/other/list_commit_dates.csv")
+df <- read_csv("data/list_commit_dates.csv")
 
 df <- df %>% 
   filter(
@@ -16,7 +16,7 @@ all_models <- unique(df$model)
 all_dates <- unique(df$forecast_date)
 all_indicators <- unique(df$indicator)
 
-all_models <- all_models[all_models != "KIT-MeanEnsemble"]
+# all_models <- all_models[all_models != "KIT-MeanEnsemble"]
 
 all_combinations <- expand.grid(
   model = all_models,
@@ -35,6 +35,16 @@ df_full <- all_combinations %>%
       retrospective == FALSE ~ "Prospective"
     )
   )
+
+# re-name ensembles:
+df_full$model[df_full$model == "KIT-MeanEnsemble" & df_full$indicator == "are"] <- "KIT-EnsembleComplete"
+df_full$model[df_full$model == "KIT-MeanEnsemble" & df_full$indicator == "sari"] <- "KIT-EnsembleRealtime"
+# add retrospective ensemble for SARI:
+subset_ensemble_sari <- filter(df_full, model == "KIT-EnsembleRealtime")
+subset_ensemble_sari$model <- "KIT-EnsembleComplete"
+subset_ensemble_sari$status <- "Retrospective"
+df_full <- bind_rows(df_full, subset_ensemble_sari)
+
 
 df_full <- df_full %>%
   mutate(
@@ -75,6 +85,7 @@ df_full <- df_full %>%
       levels = c("ARI", "SARI", "Influenza", "RSV")
     )
   )
+
 
 
 # Plot with faceting by indicator
