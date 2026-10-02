@@ -5,7 +5,7 @@ Sys.setlocale("LC_ALL", "C")
 
 # FIGURE 5
 
-ind <- "rsv" # change to "rsv" for RSV
+ind <- "influenza" # change to "rsv" for RSV
 
 # handle themes:
 custom_theme <- theme(
@@ -38,6 +38,9 @@ dates1 <- as.Date(c("2024-10-31", "2024-11-28", "2025-01-16", "2025-01-30", "202
 
 age_group <- c("00+")
 model      <- "HZI-ODEmodel"
+
+# christmas break period to highlight
+christmas_break <- as.Date(c("2024-12-24", "2025-01-08"))
 
 # collect all truth data versions in one data.frame:
 # df_all <- cross_df(list(indicator = indicators, date_version = dates)) %>%
@@ -79,8 +82,7 @@ truth_all <- pmap_dfr(truth_spec, function(indicator, date_version, window) {
 truth_all_ind <- truth_all %>% filter(indicator == ind)
 
 # final truth:
-truth_final_ind <- read_csv(paste0("https://raw.githubusercontent.com/KITmetricslab/RESPINOW-Hub/refs/heads/main/data/survstat/",
-                                   ind, "/target-survstat-", 
+truth_final_ind <- read_csv(paste0("data/target-survstat-", 
                                    ind, 
                                    ".csv"))
 truth_final_ind <- truth_final_ind %>% filter(location == "DE" & 
@@ -139,7 +141,7 @@ vlines <- bind_rows(
   tibble(date = dates1[-length(dates1)], window = "window1")
 )
 
-alphas <- c("50%" = 0.7, "95%" = 0.4)
+alphas <- c("50%" = 0.7, "95%" = 0.3)
 
 # labels, titles and limits:
 ylabs <- c("sari" = "SARI incidence",
@@ -161,6 +163,10 @@ ggplot(truth_all_ind) +
     scales = "free_y",
     labeller = labeller(indicator = facet_labels, window = window_labels)
   ) +
+  annotate("rect", xmin = christmas_break[1], 
+           xmax = christmas_break[2],
+           ymin = ylims[[ind]][1], ymax = ylims[[ind]][2], colour = NA, 
+           fill = "lightgrey", alpha = 0.5) +
   # scale_y_continuous(limits = c(0, NA)) +
   geom_vline(
     data = vlines,
@@ -184,12 +190,17 @@ ggplot(truth_all_ind) +
     aes(x = target_end_date, y = quantile_0.5, group = forecast_date),
     color = "seagreen"
   ) +
+  geom_point(
+    data = forecast_ind,
+    aes(x = target_end_date, y = quantile_0.5, group = forecast_date),
+    color = "seagreen", fill = "white", shape = 21, size = 0.6
+  ) +
   
-  # # observed as-of
-  # geom_line(
-  #   aes(x = date, y = value, group = data_version, color = "as of forecast date"),
-  #   linewidth = 0.4
-  # ) +
+  # observed as-of - not actually shown here, but somehow adapts x-axis labelling
+  geom_line(
+    aes(x = date, y = 0*value, group = data_version),
+    linewidth = 0
+  ) +
   
   # observed final (per window)
   geom_line(
@@ -197,10 +208,15 @@ ggplot(truth_all_ind) +
     aes(x = date, y = value, color = "final"),
     linewidth = 0.4
   ) +
+  geom_point(
+    data = truth_final_ind,
+    aes(x = date, y = value, color = "final"),
+    size = 0.6, shape = 16
+  ) +
   
   scale_color_manual(
     name = "Data version",
-    values = c("as of forecast date" = "#D55E00", "final" = "black")
+    values = c("final" = "black")
   ) +
   scale_fill_manual(
     name = " ",
@@ -210,15 +226,20 @@ ggplot(truth_all_ind) +
     name = " ",
     values = c("Forecast date" = "dotted")
   ) +
-  scale_alpha_manual(values = alphas, guide = "none") +
+  scale_alpha_manual(values = alphas, 
+                     name = "Prediction intervals") +
   scale_y_continuous(labels = scales::comma, limits = ylims[[ind]]) +
   labs(x = NULL, y = ylabs[ind], linetype = NULL) +
   theme_bw() +
+  theme(strip.text.y = element_blank()) +
   custom_theme +
   theme(legend.position = "right",
         strip.background.x = element_blank(),
         strip.text.x = element_blank()) +
-  ggtitle(titles[ind])
+  ggtitle(titles[ind]) +
+  guides(linetype = guide_legend(order = 1),
+         col = guide_legend(order = 2),
+         alpha = guide_legend(order = 3))
 
 # write out:
 ggsave(
