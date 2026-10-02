@@ -31,7 +31,8 @@ labels_ind <- c("are" = "ARI",
 # custom plotting functions. Note: these automatically write out plots to PDFs.
 
 # summary plot for a given level (national level or age groups):
-plot_wis_by_level <- function(df_long, models = NULL, label = "") {
+plot_wis_by_level <- function(df_long, models = NULL, label = "",
+                              baseline = "KIT-persistence", log = FALSE) {
   if (!is.null(models)) {
     df_long <- df_long %>% filter(model %in% models)
   }
@@ -50,12 +51,27 @@ plot_wis_by_level <- function(df_long, models = NULL, label = "") {
   
   # Separate WIS and its components for plotting
   df_wis <- df_long %>% filter(metric == "wis")
+  baseline_wis <- df_wis$value[df_wis$model == baseline]
+  df_wis$baseline <- baseline_wis
+  
   df_ae <- df_long %>% filter(metric == "ae")
   df_ae$metric_point <- "ae"
   df_components <- df_long %>% filter(metric %in% c("underprediction", "spread", "overprediction"))
   
+  # # auxiliary data needed for horizontal line:
+  # line_data <- data.frame(
+  #   kind = c("Forecast"),  # facet to target
+  #   level = unique(df_wis$level),
+  #   yintercept = c(10000)
+  # )
+  
   # plot:
   p <- ggplot() +
+    geom_line(
+      data = df_wis,
+      aes(x = model, y = baseline, group = kind), 
+      lty = "dotted", colour = "black"
+    ) +
     geom_bar(
       data = df_wis,
       aes(x = model, y = value, color = model),
@@ -92,6 +108,7 @@ plot_wis_by_level <- function(df_long, models = NULL, label = "") {
         by_layer_x=TRUE),
       drop=TRUE,
     ) +
+    scale_y_continuous(sec.axis = sec_axis(trans = ~ ./baseline_wis, name="relWIS")) +
     scale_color_manual(values = MODEL_COLORS, guide = "none") +
     scale_fill_manual(values = MODEL_COLORS, guide = "none") +
     scale_x_discrete(labels = MODEL_LABELS) +
@@ -119,47 +136,65 @@ plot_wis_by_level <- function(df_long, models = NULL, label = "") {
     custom_theme + # Assumes you’ve defined this elsewhere
     theme(
       legend.position = "right",
-    )
+    ) 
   
   return(p)
 }
 
 # wrapper around plot_wis_by_level which loads stuf and saves output:
-plot_wis <- function(disease, export = TRUE, models = NULL) {
+plot_wis <- function(disease, export = TRUE, models = NULL, log = FALSE) {
   
   if(is.null(models)){
     models <- c(MODELS_NOWCAST[[disease]], MODELS_FORECAST[[disease]])
   }
   
   # get scores:
-  df <- load_scores(diseases = disease, by_horizon = FALSE) %>%
+  df <- load_scores(diseases = disease, by_horizon = FALSE, summarize = TRUE) %>%
     mutate(
       kind = factor(
         ifelse(model %in% NOWCAST_MODELS, "Nowcast", "Forecast"),
         levels = c("Nowcast", "Forecast")
       )
-    ) %>%
+    ) 
+  
+  # swap in values after log-transform if desired
+  if(log){
+    df$wis <- df$wis_log
+    df$ae <- df$ae_log
+    df$underprediction <- df$underprediction_log
+    df$overprediction <- df$overprediction_log
+    df$spread <- df$spread_log
+  }
+  
+  # pivot to long format for plotting
+  df <- df %>%
     pivot_longer(
       c(wis, underprediction, spread, overprediction, ae),
       names_to = "metric",
       values_to = "value"
     )
-  # restrict to models:
-  df <- filter(df, model %in% models)
+  # restrict to models and relevant columns:
+  df <- filter(df, model %in% models) %>%
+    select(disease, level, model, metric, kind, value)
+  
   # national:
   p_nat <- df %>%
     filter(level == "national") %>%
-    plot_wis_by_level(label = labels_ind[disease])
+    plot_wis_by_level(label = labels_ind[disease], log = log)
+  
   # age groups:
   p_age <- df %>%
     filter(level == "age") %>%
-    plot_wis_by_level(label = labels_ind[disease])
+    plot_wis_by_level(label = labels_ind[disease], log = log)
+  
   # stitch together:
   p <- p_nat + p_age + patchwork::plot_layout(guides = "collect")
+  
   # export:
   if (export) {
     ggsave(
-      paste0("figures/wis_", disease, ".pdf"),
+      paste0("figures/wis_", disease,
+             ifelse(log, "_log", ""), ".pdf"),
       plot = p,
       width = 190.5,
       height = 110,
@@ -171,10 +206,14 @@ plot_wis <- function(disease, export = TRUE, models = NULL) {
 }
 
 # apply to each target:
+undebug(plot_wis)
 plot_wis("are")
 plot_wis("sari")
-plot_wis("rsv")
-plot_wis("influenza")
+
+
+# apply to each target with log:
+plot_wis("are", log = TRUE)
+plot_wis("sari", log = TRUE)
 
 # # get scores:
 # scores <- read.csv("data/scores.csv")
@@ -264,7 +303,7 @@ plot_wis_by_horizon_disease <- function(disease, export = TRUE, add_ae = FALSE, 
     models <- c(MODELS_NOWCAST[[disease]], MODELS_FORECAST[[disease]])
   }
   
-  df_scores_long <- load_scores(diseases = disease, by_horizon = TRUE) %>%
+  df_scores_long <- load_scores(diseases = disease, by_horizon = TRUE, summarize = TRUE) %>%
     filter(level != "states") %>% 
     pivot_longer(
       cols = c(wis, underprediction, spread, overprediction, ae),
@@ -291,8 +330,6 @@ plot_wis_by_horizon_disease <- function(disease, export = TRUE, add_ae = FALSE, 
 # apply to four indicators:
 plot_wis_by_horizon_disease("sari")
 plot_wis_by_horizon_disease("are")
-plot_wis_by_horizon_disease("influenza")
-plot_wis_by_horizon_disease("rsv")
 
 # special plot comparing hhh4 and hhh4-christmas
 plot_wis_by_horizon_disease("are", models = c("KIT-hhh4", "KIT-hhh4_christmas"), label = "christmas")
@@ -308,7 +345,7 @@ plot_wis_by_age <- function(disease, export = TRUE, models = NULL) {
     models <- c(MODELS_NOWCAST[[disease]], MODELS_FORECAST[[disease]])
   }
   
-  df_long <- load_scores(diseases = disease, by_age = TRUE) %>%
+  df_long <- load_scores(diseases = disease, by_age = TRUE, summarize = TRUE) %>%
     filter(age_group != "00+") %>%
     mutate(
       kind = factor(
@@ -443,6 +480,7 @@ plot_wis_by_age <- function(disease, export = TRUE, models = NULL) {
 
 plot_wis_by_age("sari")
 plot_wis_by_age("are")
-plot_wis_by_age("rsv")
-plot_wis_by_age("influenza")
+
+
+
 
